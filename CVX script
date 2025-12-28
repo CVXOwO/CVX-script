@@ -532,7 +532,7 @@ local function setupFastAttack()
             end
 
             local FastAttack = {
-                Distance = 100000,
+                Distance = 100000000,
                 attackMobs = true,
                 attackPlayers = true,
                 Equipped = nil
