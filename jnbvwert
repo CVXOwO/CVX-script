@@ -2,7 +2,6 @@ local StarterGui = game:GetService("StarterGui")
 local Players = game:GetService("Players")
 local WhitelistedPlayers = {
     ["rayprfrng"] = true,
-
  }
 
 local function IsWhitelisted(player)
