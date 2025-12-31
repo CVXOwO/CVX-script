@@ -19,7 +19,7 @@ if isLocalPlayerWhitelisted then
         Text = "玩家:"..localPlayer.Name.."，检测完毕白名单玩家，稍后会加载脚本",
         Duration = 7,
     })
-loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/XUAN%20hub"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/CVXOwO/blox-fruits-script/refs/heads/main/CVX%20script"))()
 else
     localPlayer:Kick("抱歉，你沒有權限使用本脚本")
 end
