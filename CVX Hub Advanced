@@ -1,7 +1,7 @@
--- CVXX腳本 - ShadowLib風格修復版 v9.8
+-- CVX腳本 - ShadowLib風格修復版 v9.8
 print("🎮 =================================")
-print("🎮 CVXX腳本 - ShadowLib風格修復版 v9.8")
-print("🎮 CVXX创作")
+print("🎮 CVX腳本 - ShadowLib風格修復版 v9.8")
+print("🎮 CVX创作")
 print("🎮 專業級遊戲輔助")
 print("🎮 =================================")
 
@@ -42,7 +42,7 @@ print("✅ UI容器: " .. playerGui.Name)
 
 -- 清理舊的UI
 for _, gui in ipairs(playerGui:GetChildren()) do
-    if gui.Name:find("CVXX") or gui.Name:find("ShadowLib") then
+    if gui.Name:find("CVX") or gui.Name:find("ShadowLib") then
         gui:Destroy()
         print("🗑️ 清理了舊UI: " .. gui.Name)
     end
@@ -135,7 +135,7 @@ function library.new(name)
     local author = Instance.new("TextLabel", loadFrame)
     author.Size = UDim2.new(1, 0, 0, 25)
     author.Position = UDim2.new(0, 0, 0.3, 0)
-    author.Text = "by CVXX"
+    author.Text = "by CVX"
     author.TextColor3 = Color3.fromRGB(255, 215, 0)
     author.BackgroundTransparency = 1
     author.Font = Enum.Font.Gotham
@@ -351,7 +351,7 @@ end
 -- ========================
 -- 創建主窗口
 -- ========================
-local window = library.new("CVXX腳本 v9.8")
+local window = library.new("CVX腳本 v9.8")
 
 -- 創建選項卡
 local mainTab = window:CreateTab("主頁") 
@@ -518,7 +518,7 @@ mainContainer.BackgroundTransparency = 1
 local titleLabel = Instance.new("TextLabel", mainContainer)
 titleLabel.Size = UDim2.new(1, 0, 0, 50)
 titleLabel.Position = UDim2.new(0, 0, 0, 0)
-titleLabel.Text = "👑 CVXX腳本 v9.8"
+titleLabel.Text = "👑 CVX腳本 v9.8"
 titleLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Font = Enum.Font.GothamBold
@@ -527,7 +527,7 @@ titleLabel.TextSize = 22
 local authorLabel = Instance.new("TextLabel", mainContainer)
 authorLabel.Size = UDim2.new(1, 0, 0, 30)
 authorLabel.Position = UDim2.new(0, 0, 0, 55)
-authorLabel.Text = "by CVXX"
+authorLabel.Text = "by CVX"
 authorLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 authorLabel.BackgroundTransparency = 1
 authorLabel.Font = Enum.Font.Gotham
@@ -854,7 +854,7 @@ dragInfo.LineHeight = 1.3
 local creditsLabel = Instance.new("TextLabel", settingsTab)
 creditsLabel.Size = UDim2.new(1, -20, 0, 80)
 creditsLabel.Position = UDim2.new(0, 10, 0, 110)
-creditsLabel.Text = "CVXX腳本 v9.8\nShadowLib UI 系統\n製作者: CVXX\n主要功能: 快速攻擊、腳本加載"
+creditsLabel.Text = "CVX腳本 v9.8\nShadowLib UI 系統\n製作者: CVX\n主要功能: 快速攻擊、腳本加載"
 creditsLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
 creditsLabel.BackgroundTransparency = 1
 creditsLabel.Font = Enum.Font.Gotham
@@ -876,7 +876,7 @@ titleBar.BorderSizePixel = 0
 local titleText = Instance.new("TextLabel", titleBar)
 titleText.Size = UDim2.new(1, -50, 1, 0)
 titleText.Position = UDim2.new(0, 15, 0, 0)
-titleText.Text = "CVXX腳本 v9.8"
+titleText.Text = "CVX腳本 v9.8"
 titleText.TextColor3 = Color3.fromRGB(255, 215, 0)
 titleText.BackgroundTransparency = 1
 titleText.Font = Enum.Font.GothamBold
@@ -939,7 +939,7 @@ end
 -- 初始化完成
 -- ========================
 print("🎮 =================================")
-print("🎮 CVXX腳本 v9.8 - ShadowLib風格")
+print("🎮 CVX腳本 v9.8 - ShadowLib風格")
 print("🎮 設備: " .. deviceType)
 print("🎮 功能特色:")
 print("🎮   ✅ 控制中心標題")
