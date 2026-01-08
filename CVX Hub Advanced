@@ -42,7 +42,7 @@ print("✅ UI容器: " .. playerGui.Name)
 
 -- 清理舊的UI
 for _, gui in ipairs(playerGui:GetChildren()) do
-    if gui.Name:find("XuanCong") or gui.Name:find("CVX") or gui.Name:find("ShadowLib") then
+    if gui.Name:find("CVX") or gui.Name:find("ShadowLib") then
         gui:Destroy()
         print("🗑️ 清理了舊UI: " .. gui.Name)
     end
