@@ -1,0 +1,969 @@
+-- 玄丛腳本 - ShadowLib風格修復版 v9.8
+print("🎮 =================================")
+print("🎮 玄丛腳本 - ShadowLib風格修復版 v9.8")
+print("🎮 秦始皇创作")
+print("🎮 專業級遊戲輔助")
+print("🎮 =================================")
+
+-- 檢測設備類型
+local inputService = game:GetService("UserInputService")
+local tweenService = game:GetService("TweenService")
+local runService = game:GetService("RunService")
+local players = game:GetService("Players")
+
+local isMobile = inputService.TouchEnabled
+local isDesktop = inputService.MouseEnabled
+local deviceType = isMobile and "📱 手機" or "🖥️ 電腦"
+print("✅ 檢測到設備: " .. deviceType)
+
+-- 確保遊戲完全加載
+repeat task.wait() until game:IsLoaded()
+print("✅ 遊戲已加載")
+
+-- 獲取玩家
+local player = players.LocalPlayer
+if not player then
+    warn("❌ 無法獲取玩家")
+    return
+end
+print("✅ 玩家: " .. player.Name)
+
+-- 等待PlayerGui
+local playerGui
+local success, errorMsg = pcall(function()
+    playerGui = player:WaitForChild("PlayerGui", 10)
+end)
+
+if not success or not playerGui then
+    warn("❌ 無法找到PlayerGui，嘗試使用CoreGui")
+    playerGui = game:GetService("CoreGui")
+end
+print("✅ UI容器: " .. playerGui.Name)
+
+-- 清理舊的UI
+for _, gui in ipairs(playerGui:GetChildren()) do
+    if gui.Name:find("XuanCong") or gui.Name:find("玄丛") or gui.Name:find("ShadowLib") then
+        gui:Destroy()
+        print("🗑️ 清理了舊UI: " .. gui.Name)
+    end
+end
+
+-- ========================
+-- ShadowLib 庫系統
+-- ========================
+local library = { 
+    _Tabs = {}, 
+    _Pages = {},
+    _Functions = {} -- 存儲功能狀態
+}
+
+local services = setmetatable({}, {
+    __index = function(_, k) 
+        return game:GetService(k) 
+    end
+})
+
+local ts, uis, players = services.TweenService, services.UserInputService, services.Players
+local lp = players.LocalPlayer
+
+-- 拖動功能
+function library:AddDrag(obj)
+    local dragging, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = obj.Position
+        end
+    end)
+    
+    uis.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X, 
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    uis.InputEnded:Connect(function() 
+        dragging = false 
+    end)
+end
+
+-- 創建主窗口
+function library.new(name)
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "ShadowLib_XuanCong"
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sg.Parent = playerGui
+    
+    -- 載入畫面
+    local loadFrame = Instance.new("Frame", sg)
+    loadFrame.Size = UDim2.new(0, 350, 0, 150)
+    loadFrame.Position = UDim2.new(0.5, -175, 0.5, -75)
+    loadFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+    loadFrame.BackgroundTransparency = 0.05
+    loadFrame.BorderSizePixel = 0
+    Instance.new("UICorner", loadFrame)
+    
+    local barBg = Instance.new("Frame", loadFrame)
+    barBg.Size = UDim2.new(0.8, 0, 0, 10)
+    barBg.Position = UDim2.new(0.1, 0, 0.7, 0)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
+    barBg.BorderSizePixel = 0
+    
+    local bar = Instance.new("Frame", barBg)
+    bar.Size = UDim2.new(0, 0, 1, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+    bar.BorderSizePixel = 0
+    Instance.new("UICorner", bar)
+    
+    local info = Instance.new("TextLabel", loadFrame)
+    info.Size = UDim2.new(1, 0, 0.4, 0)
+    info.Position = UDim2.new(0, 0, 0.1, 0)
+    info.Text = name .. " 加載中..."
+    info.TextColor3 = Color3.fromRGB(255, 255, 255)
+    info.BackgroundTransparency = 1
+    info.Font = Enum.Font.GothamBold
+    info.TextSize = 16
+    
+    local author = Instance.new("TextLabel", loadFrame)
+    author.Size = UDim2.new(1, 0, 0, 25)
+    author.Position = UDim2.new(0, 0, 0.3, 0)
+    author.Text = "by 秦始皇"
+    author.TextColor3 = Color3.fromRGB(255, 215, 0)
+    author.BackgroundTransparency = 1
+    author.Font = Enum.Font.Gotham
+    author.TextSize = 14
+    
+    -- 載入動畫
+    ts:Create(bar, TweenInfo.new(2, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+    task.wait(2.2)
+    loadFrame:Destroy()
+    
+    -- 主窗口
+    local Main = Instance.new("Frame", sg)
+    Main.Size = UDim2.new(0, 500, 0, 320)
+    Main.Position = UDim2.new(0.5, -250, 0.5, -160)
+    Main.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+    Main.BackgroundTransparency = 0.05
+    Main.Visible = false
+    Main.ClipsDescendants = true
+    Main.BorderSizePixel = 0
+    Instance.new("UICorner", Main)
+    library:AddDrag(Main)
+    library.Main = Main
+    
+    -- 開關按鈕 - 皇冠 👑
+    local ToggleBtn = Instance.new("TextButton", sg)
+    ToggleBtn.Size = UDim2.new(0, 55, 0, 55)
+    ToggleBtn.Position = UDim2.new(0, 20, 0, 20)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 20, 10)
+    ToggleBtn.Text = "👑"
+    ToggleBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+    ToggleBtn.TextSize = 32
+    ToggleBtn.ZIndex = 10
+    ToggleBtn.AutoButtonColor = true
+    ToggleBtn.BorderSizePixel = 0
+    
+    local crownCorner = Instance.new("UICorner", ToggleBtn)
+    crownCorner.CornerRadius = UDim.new(0.3, 0)
+    
+    local crownStroke = Instance.new("UIStroke", ToggleBtn)
+    crownStroke.Color = Color3.fromRGB(255, 215, 0)
+    crownStroke.Thickness = 2.5
+    
+    library:AddDrag(ToggleBtn)
+    
+    local glowEffect = Instance.new("Frame", ToggleBtn)
+    glowEffect.Size = UDim2.new(1, 6, 1, 6)
+    glowEffect.Position = UDim2.new(0, -3, 0, -3)
+    glowEffect.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+    glowEffect.BackgroundTransparency = 0.7
+    glowEffect.BorderSizePixel = 0
+    glowEffect.ZIndex = 9
+    Instance.new("UICorner", glowEffect).CornerRadius = UDim.new(0.3, 0)
+    
+    -- 金色漣漪動畫
+    task.spawn(function()
+        while true do
+            if not sg.Parent then break end
+            local Ripple = Instance.new("Frame", ToggleBtn)
+            Ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+            Ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+            Ripple.Size = UDim2.new(1, 0, 1, 0)
+            Ripple.BackgroundTransparency = 0.6
+            Ripple.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+            Ripple.BorderSizePixel = 0
+            Ripple.ZIndex = 8
+            Instance.new("UICorner", Ripple).CornerRadius = UDim.new(0.3, 0)
+            
+            ts:Create(Ripple, TweenInfo.new(1.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Size = UDim2.new(2.5, 0, 2.5, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(2)
+            if Ripple then Ripple:Destroy() end
+        end
+    end)
+    
+    -- 開關按鈕功能
+    ToggleBtn.MouseButton1Click:Connect(function()
+        if not Main.Visible then
+            Main.Size = UDim2.new(0, 500, 0, 0)
+            Main.Visible = true
+            ts:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 500, 0, 320)}):Play()
+            
+            ts:Create(ToggleBtn, TweenInfo.new(0.1), {
+                Size = UDim2.new(0, 53, 0, 53)
+            }):Play()
+            task.wait(0.1)
+            ts:Create(ToggleBtn, TweenInfo.new(0.1), {
+                Size = UDim2.new(0, 55, 0, 55)
+            }):Play()
+        else
+            ts:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 500, 0, 0)}):Play()
+            
+            ts:Create(ToggleBtn, TweenInfo.new(0.1), {
+                Size = UDim2.new(0, 53, 0, 53)
+            }):Play()
+            task.wait(0.1)
+            ts:Create(ToggleBtn, TweenInfo.new(0.1), {
+                Size = UDim2.new(0, 55, 0, 55)
+            }):Play()
+            
+            task.wait(0.3)
+            Main.Visible = false
+        end
+    end)
+    
+    ToggleBtn.MouseEnter:Connect(function()
+        ts:Create(ToggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(40, 35, 20),
+            TextColor3 = Color3.fromRGB(255, 255, 100)
+        }):Play()
+        ts:Create(crownStroke, TweenInfo.new(0.2), {
+            Color = Color3.fromRGB(255, 255, 100),
+            Thickness = 3
+        }):Play()
+        ts:Create(glowEffect, TweenInfo.new(0.2), {
+            BackgroundTransparency = 0.5
+        }):Play()
+    end)
+    
+    ToggleBtn.MouseLeave:Connect(function()
+        ts:Create(ToggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(25, 20, 10),
+            TextColor3 = Color3.fromRGB(255, 215, 0)
+        }):Play()
+        ts:Create(crownStroke, TweenInfo.new(0.2), {
+            Color = Color3.fromRGB(255, 215, 0),
+            Thickness = 2.5
+        }):Play()
+        ts:Create(glowEffect, TweenInfo.new(0.2), {
+            BackgroundTransparency = 0.7
+        }):Play()
+    end)
+    
+    return library
+end
+
+-- 創建選項卡
+function library:CreateTab(name)
+    local SideBar = self.Main:FindFirstChild("SideBar") or Instance.new("Frame", self.Main)
+    
+    if SideBar.Name ~= "SideBar" then
+        SideBar.Name = "SideBar"
+        SideBar.Size = UDim2.new(0, 120, 1, -35)
+        SideBar.Position = UDim2.new(0, 0, 0, 35)
+        SideBar.BackgroundColor3 = Color3.fromRGB(10, 12, 15)
+        SideBar.BackgroundTransparency = 0.1
+        SideBar.BorderSizePixel = 0
+        Instance.new("UICorner", SideBar)
+        
+        local layout = Instance.new("UIListLayout", SideBar)
+        layout.Padding = UDim.new(0, 8)
+        layout.HorizontalAlignment = "Center"
+        layout.VerticalAlignment = "Top"
+        layout.SortOrder = "LayoutOrder"
+    end
+    
+    local ContentPage = Instance.new("ScrollingFrame", self.Main)
+    ContentPage.Name = name .. "_Page"
+    ContentPage.Size = UDim2.new(1, -135, 1, -55)
+    ContentPage.Position = UDim2.new(0, 130, 0, 45)
+    ContentPage.BackgroundTransparency = 1
+    ContentPage.Visible = false
+    ContentPage.ScrollBarThickness = 2
+    ContentPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    ContentPage.BorderSizePixel = 0
+    
+    local pageLayout = Instance.new("UIListLayout", ContentPage)
+    pageLayout.Padding = UDim.new(0, 10)
+    pageLayout.HorizontalAlignment = "Center"
+    pageLayout.SortOrder = "LayoutOrder"
+    
+    local TabBtn = Instance.new("TextButton", SideBar)
+    TabBtn.Size = UDim2.new(0.9, 0, 0, 40)
+    TabBtn.Text = name:upper()
+    TabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
+    TabBtn.BackgroundTransparency = 0.5
+    TabBtn.BorderSizePixel = 0
+    TabBtn.Font = Enum.Font.GothamBold
+    TabBtn.TextSize = 14
+    TabBtn.AutoButtonColor = true
+    Instance.new("UICorner", TabBtn)
+    
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, child in ipairs(SideBar:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.TextColor3 = Color3.fromRGB(150, 150, 150)
+                child.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
+            end
+        end
+        
+        TabBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+        
+        for _, p in pairs(self._Pages) do 
+            p.Visible = false 
+        end
+        ContentPage.Visible = true
+    end)
+    
+    table.insert(self._Pages, ContentPage)
+    
+    if #self._Pages == 1 then 
+        ContentPage.Visible = true 
+        TabBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+    end
+    
+    return ContentPage
+end
+
+-- ========================
+-- 創建主窗口
+-- ========================
+local window = library.new("玄丛腳本 v9.8")
+
+-- 創建選項卡
+local mainTab = window:CreateTab("主頁") 
+local scriptsTab = window:CreateTab("腳本") 
+local functionsTab = window:CreateTab("功能") 
+local settingsTab = window:CreateTab("設置")
+
+-- ========================
+-- 腳本加載功能
+-- ========================
+local function loadScript(name, url, button, iconLabel)
+    print("📥 正在加載: " .. name)
+    
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    
+    if success then
+        print("✅ " .. name .. " 加載成功")
+        if button and iconLabel then
+            button.Text = name .. " [已加載]"
+            button.TextColor3 = Color3.fromRGB(255, 215, 0)
+            iconLabel.Text = "👑"
+            iconLabel.TextSize = 16
+        end
+    else
+        print("❌ " .. name .. " 加載失敗: " .. tostring(result))
+        if button and iconLabel then
+            button.Text = name .. " [失敗]"
+            button.TextColor3 = Color3.fromRGB(255, 50, 50)
+            iconLabel.Text = "❌"
+            iconLabel.TextSize = 16
+        end
+    end
+    
+    return success, result
+end
+
+-- ========================
+-- 創建功能按鈕
+-- ========================
+local function createFunctionButton(name, parent, callback)
+    local btnFrame = Instance.new("Frame", parent)
+    btnFrame.Size = UDim2.new(1, -20, 0, 45)
+    btnFrame.BackgroundTransparency = 1
+    btnFrame.LayoutOrder = parent:GetChildren() and #parent:GetChildren() or 0
+    
+    local btn = Instance.new("TextButton", btnFrame)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.AutoButtonColor = true
+    btn.BorderSizePixel = 0
+    
+    local icon = Instance.new("TextLabel", btn)
+    icon.Size = UDim2.new(0, 35, 1, 0)
+    icon.Position = UDim2.new(0, 10, 0, 0)
+    icon.Text = "⚡"
+    icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+    icon.BackgroundTransparency = 1
+    icon.Font = Enum.Font.GothamBold
+    icon.TextSize = 16
+    icon.TextXAlignment = "Left"
+    
+    local status = Instance.new("Frame", btn)
+    status.Size = UDim2.new(0, 10, 0, 10)
+    status.Position = UDim2.new(1, -15, 0.5, -5)
+    status.BackgroundColor3 = Color3.fromRGB(100, 90, 60)
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", btn)
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(40, 35, 20)
+        icon.TextColor3 = Color3.fromRGB(255, 255, 100)
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        if status.BackgroundColor3 == Color3.fromRGB(255, 215, 0) then
+            btn.BackgroundColor3 = Color3.fromRGB(30, 40, 20)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+            icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+        end
+    end)
+    
+    btn.MouseButton1Click:Connect(function()
+        if callback then
+            callback(btn, status, icon)
+        end
+    end)
+    
+    return btn, status, icon
+end
+
+-- ========================
+-- 主頁內容 (修改：添加G八中心標題和右上角關閉按鈕)
+-- ========================
+-- 創建主頁頂部標題欄
+local mainHeader = Instance.new("Frame", mainTab)
+mainHeader.Name = "MainHeader"
+mainHeader.Size = UDim2.new(1, -20, 0, 40)
+mainHeader.Position = UDim2.new(0, 10, 0, 10)
+mainHeader.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+mainHeader.BackgroundTransparency = 0.3
+mainHeader.BorderSizePixel = 0
+Instance.new("UICorner", mainHeader)
+
+-- G八中心標題 (置中)
+local g8CenterTitle = Instance.new("TextLabel", mainHeader)
+g8CenterTitle.Size = UDim2.new(0.7, 0, 1, 0)
+g8CenterTitle.Position = UDim2.new(0.15, 0, 0, 0)
+g8CenterTitle.Text = "🎮 G八中心"
+g8CenterTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+g8CenterTitle.BackgroundTransparency = 1
+g8CenterTitle.Font = Enum.Font.GothamBold
+g8CenterTitle.TextSize = 20
+g8CenterTitle.TextXAlignment = "Center"
+g8CenterTitle.TextYAlignment = "Center"
+
+-- 主頁右上角關閉按鈕
+local mainCloseBtn = Instance.new("TextButton", mainHeader)
+mainCloseBtn.Size = UDim2.new(0, 30, 0, 30)
+mainCloseBtn.Position = UDim2.new(1, -35, 0.5, -15)
+mainCloseBtn.Text = "✕"
+mainCloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+mainCloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+mainCloseBtn.BackgroundTransparency = 0.5
+mainCloseBtn.Font = Enum.Font.GothamBold
+mainCloseBtn.TextSize = 18
+mainCloseBtn.AutoButtonColor = true
+
+local mainCloseCorner = Instance.new("UICorner", mainCloseBtn)
+mainCloseCorner.CornerRadius = UDim.new(0.2, 0)
+
+local mainCloseStroke = Instance.new("UIStroke", mainCloseBtn)
+mainCloseStroke.Color = Color3.fromRGB(80, 80, 100)
+mainCloseStroke.Thickness = 1.5
+
+mainCloseBtn.MouseButton1Click:Connect(function()
+    window.Main.Visible = false
+end)
+
+mainCloseBtn.MouseEnter:Connect(function()
+    mainCloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    mainCloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+    mainCloseStroke.Color = Color3.fromRGB(100, 100, 120)
+end)
+
+mainCloseBtn.MouseLeave:Connect(function()
+    mainCloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    mainCloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    mainCloseStroke.Color = Color3.fromRGB(80, 80, 100)
+end)
+
+-- 主頁內容容器 (下移避開標題欄)
+local mainContainer = Instance.new("Frame", mainTab)
+mainContainer.Size = UDim2.new(1, -20, 1, -60) -- 調整高度
+mainContainer.Position = UDim2.new(0, 10, 0, 60) -- 下移
+mainContainer.BackgroundTransparency = 1
+
+local titleLabel = Instance.new("TextLabel", mainContainer)
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.Text = "👑 玄丛腳本 v9.8"
+titleLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 22
+
+local authorLabel = Instance.new("TextLabel", mainContainer)
+authorLabel.Size = UDim2.new(1, 0, 0, 30)
+authorLabel.Position = UDim2.new(0, 0, 0, 55)
+authorLabel.Text = "by 秦始皇"
+authorLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+authorLabel.BackgroundTransparency = 1
+authorLabel.Font = Enum.Font.Gotham
+authorLabel.TextSize = 16
+
+local supportLabel = Instance.new("TextLabel", mainContainer)
+supportLabel.Size = UDim2.new(1, 0, 0, 25)
+supportLabel.Position = UDim2.new(0, 0, 0, 90)
+supportLabel.Text = "✅ PC支持此腳本"
+supportLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+supportLabel.BackgroundTransparency = 1
+supportLabel.Font = Enum.Font.GothamBold
+supportLabel.TextSize = 15
+
+local descLabel = Instance.new("TextLabel", mainContainer)
+descLabel.Size = UDim2.new(1, 0, 0, 90)
+descLabel.Position = UDim2.new(0, 0, 0, 120)
+descLabel.Text = "專業級遊戲輔助工具\n多功能腳本集合系統\n點擊左上角皇冠按鈕開啟/關閉"
+descLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+descLabel.BackgroundTransparency = 1
+descLabel.Font = Enum.Font.Gotham
+descLabel.TextSize = 14
+descLabel.TextWrapped = true
+descLabel.LineHeight = 1.3
+
+local extraInfo = Instance.new("TextLabel", mainContainer)
+extraInfo.Size = UDim2.new(1, 0, 0, 60)
+extraInfo.Position = UDim2.new(0, 0, 0, 220)
+extraInfo.Text = "📌 使用說明：\n• 點擊功能按鈕啟用對應功能\n• 腳本需要網絡連接加載\n• 建議在單人遊戲中使用"
+extraInfo.TextColor3 = Color3.fromRGB(180, 200, 255)
+extraInfo.BackgroundTransparency = 1
+extraInfo.Font = Enum.Font.Gotham
+extraInfo.TextSize = 12
+extraInfo.TextWrapped = true
+extraInfo.LineHeight = 1.4
+
+-- ========================
+-- 腳本頁面內容
+-- ========================
+local piBtn, piStatus, piIcon = createFunctionButton("皮腳本", scriptsTab, function(btn, status, icon)
+    loadScript("皮腳本", "https://raw.githubusercontent.com/xiaopi77/xiaopi77/main/QQ1002100032-Roblox-Pi-script.lua", btn, icon)
+end)
+
+local xaBtn, xaStatus, xaIcon = createFunctionButton("XA腳本", scriptsTab, function(btn, status, icon)
+    loadScript("XA腳本", "https://raw.gitcode.com/Xingtaiduan/Scripts/raw/main/Loader.lua", btn, icon)
+end)
+
+-- ========================
+-- 快速攻擊功能
+-- ========================
+local fastAttackActive = false
+local fastAttackConnection = nil
+
+local function setupFastAttack()
+    if not fastAttackActive then return end
+    
+    _G.FastAttack = true
+
+    if _G.FastAttack then
+        local _ENV = (getgenv or getrenv or getfenv)()
+
+        local function SafeWaitForChild(parent, childName)
+            local success, result = pcall(function()
+              return parent:WaitForChild(childName)
+            end)
+            if not success or not result then
+                warn("noooooo: " .. childName)
+            end
+            return result
+        end
+
+        local function WaitChilds(path, ...)
+            local last = path
+            for _, child in {...} do
+                last = last:FindFirstChild(child) or SafeWaitForChild(last, child)
+                if not last then break end
+            end
+            return last
+        end
+
+        local VirtualInputManager = game:GetService("VirtualInputManager")
+        local CollectionService = game:GetService("CollectionService")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local TeleportService = game:GetService("TeleportService")
+        local RunService = game:GetService("RunService")
+        local Players = game:GetService("Players")
+        local Player = Players.LocalPlayer
+
+        if not Player then
+            warn("未找到本地玩家.")
+            return
+        end
+
+        local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
+        if not Remotes then return end
+
+        local Validator = SafeWaitForChild(Remotes, "Validator")
+        local CommF = SafeWaitForChild(Remotes, "CommF_")
+        local CommE = SafeWaitForChild(Remotes, "CommE")
+
+        local ChestModels = SafeWaitForChild(workspace, "ChestModels")
+        local WorldOrigin = SafeWaitForChild(workspace, "_WorldOrigin")
+        local Characters = SafeWaitForChild(workspace, "Characters")
+        local Enemies = SafeWaitForChild(workspace, "Enemies")
+        local Map = SafeWaitForChild(workspace, "Map")
+
+        local EnemySpawns = SafeWaitForChild(WorldOrigin, "EnemySpawns")
+        local Locations = SafeWaitForChild(WorldOrigin, "Locations")
+
+        local RenderStepped = RunService.RenderStepped
+        local Heartbeat = RunService.Heartbeat
+        local Stepped = RunService.Stepped
+
+        local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
+        local Net = SafeWaitForChild(Modules, "Net")
+
+        local sethiddenproperty = sethiddenproperty or function(...) return ... end
+        local setupvalue = setupvalue or (debug and debug.setupvalue)
+        local getupvalue = getupvalue or (debug and debug.getupvalue)
+
+        local Settings = {
+            AutoClick = true,
+            ClickDelay = 0.0000000001
+        }
+
+        local Module = {}
+
+        Module.FastAttack = (function()
+            if _ENV.rz_FastAttack then
+                return _ENV.rz_FastAttack
+            end
+
+            local FastAttack = {
+                Distance = 10000,
+                attackMobs = true,
+                attackPlayers = true,
+                Equipped = nil
+            }
+
+            local RegisterAttack = SafeWaitForChild(Net, "RE/RegisterAttack")
+            local RegisterHit = SafeWaitForChild(Net, "RE/RegisterHit")
+
+            local function IsAlive(character)
+            return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
+            end
+
+            local function ProcessEnemies(OthersEnemies, Folder)
+                local BasePart = nil
+                for _, Enemy in Folder:GetChildren() do
+                    local Head = Enemy:FindFirstChild("Head")
+                    if Head and IsAlive(Enemy) and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
+                        if Enemy ~= Player.Character then
+                            table.insert(OthersEnemies, { Enemy, Head })
+                            BasePart = Head
+                        end
+                    end
+                end
+                return BasePart
+            end
+
+            function FastAttack:Attack(BasePart, OthersEnemies)
+                if not BasePart or #OthersEnemies == 0 then return end
+                RegisterAttack:FireServer(Settings.ClickDelay or 0)
+                RegisterHit:FireServer(BasePart, OthersEnemies)
+            end
+
+            function FastAttack:AttackNearest()
+                local OthersEnemies = {}
+                local Part1 = ProcessEnemies(OthersEnemies, Enemies)
+                local Part2 = ProcessEnemies(OthersEnemies, Characters)
+                if #OthersEnemies > 0 then
+                    self:Attack(Part1 or Part2, OthersEnemies)
+                else
+                    task.wait(0)
+                end
+            end
+
+            function FastAttack:BladeHits()
+                local Equipped = IsAlive(Player.Character) and Player.Character:FindFirstChildOfClass("Tool")
+                if Equipped and Equipped.ToolTip ~= "Gun" then
+                    self:AttackNearest()
+                else
+                    task.wait(0)
+                end
+            end
+
+            task.spawn(function()
+                while task.wait(Settings.ClickDelay) do
+                    if not _G.FastAttack then
+                        break
+                    end
+                    if Settings.AutoClick then
+                        FastAttack:BladeHits()
+                    end
+                end
+            end)
+
+            _ENV.rz_FastAttack = FastAttack
+            return FastAttack
+        end)()
+    end
+end
+
+-- ========================
+-- 功能頁面內容
+-- ========================
+-- 快速攻擊功能
+local fastAttackBtn, fastAttackStatus, fastAttackIcon = createFunctionButton("快速攻擊 [OFF]", functionsTab, function(btn, status, icon)
+    fastAttackActive = not fastAttackActive
+    
+    if fastAttackActive then
+        btn.Text = "快速攻擊 [ON]"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 40, 20)
+        status.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+        icon.Text = "👑"
+        icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+        icon.TextSize = 16
+        
+        print("⚡ 快速攻擊已啟動")
+        
+        setupFastAttack()
+        
+    else
+        btn.Text = "快速攻擊 [OFF]"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+        status.BackgroundColor3 = Color3.fromRGB(100, 90, 60)
+        icon.Text = "⚡"
+        icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+        icon.TextSize = 16
+        
+        print("🛑 快速攻擊已停止")
+        _G.FastAttack = false
+        
+        if getgenv then
+            getgenv().rz_FastAttack = nil
+        end
+        
+        if fastAttackConnection then
+            pcall(function()
+                task.cancel(fastAttackConnection)
+                fastAttackConnection = nil
+            end)
+        end
+    end
+end)
+
+-- 飛行腳本功能
+local flightBtn, flightStatus, flightIcon = createFunctionButton("飛行腳本 [未加載]", functionsTab, function(btn, status, icon)
+    loadScript("飛行腳本", "https://raw.githubusercontent.com/iqiq180jash-afk/Xuan/refs/heads/main/%E9%A3%9B%E8%A1%8C", btn, icon)
+end)
+
+-- FPS優化功能
+local fpsBtn, fpsStatus, fpsIcon = createFunctionButton("FPS優化 [未加載]", functionsTab, function(btn, status, icon)
+    loadScript("FPS優化", "https://raw.githubusercontent.com/kexuan001/rjrym/refs/heads/main/fpsboost", btn, icon)
+end)
+
+-- 自動V4功能
+local autoV4Btn, autoV4Status, autoV4Icon = createFunctionButton("自動V4 [OFF]", functionsTab, function(btn, status, icon)
+    local active = library._Functions["autoV4"] or false
+    library._Functions["autoV4"] = not active
+    
+    if library._Functions["autoV4"] then
+        btn.Text = "自動V4 [ON]"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 40, 20)
+        status.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+        icon.Text = "👑"
+        icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+        icon.TextSize = 16
+        
+        print("🌀 自動V4已啟動")
+        
+        task.spawn(function()
+            while library._Functions["autoV4"] do
+                local Backpack = lp:FindFirstChild("Backpack")
+                if Backpack then
+                    local Awakening = Backpack:FindFirstChild("Awakening")
+                    if Awakening then
+                        local RemoteFunc = Awakening:FindFirstChild("RemoteFunction")
+                        if RemoteFunc and RemoteFunc:IsA("RemoteFunction") then
+                            pcall(function()
+                                RemoteFunc:InvokeServer(true)
+                            end)
+                        end
+                    end
+                end
+                task.wait(5)
+            end
+        end)
+    else
+        btn.Text = "自動V4 [OFF]"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 25, 15)
+        status.BackgroundColor3 = Color3.fromRGB(100, 90, 60)
+        icon.Text = "🌀"
+        icon.TextColor3 = Color3.fromRGB(255, 215, 0)
+        icon.TextSize = 16
+        
+        print("🛑 自動V4已停止")
+    end
+end)
+
+-- ========================
+-- 設置頁面內容
+-- ========================
+local deviceLabel = Instance.new("TextLabel", settingsTab)
+deviceLabel.Size = UDim2.new(1, -20, 0, 30)
+deviceLabel.Position = UDim2.new(0, 10, 0, 10)
+deviceLabel.Text = "設備類型: " .. deviceType
+deviceLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+deviceLabel.BackgroundTransparency = 1
+deviceLabel.Font = Enum.Font.GothamBold
+deviceLabel.TextSize = 15
+
+local dragInfo = Instance.new("TextLabel", settingsTab)
+dragInfo.Size = UDim2.new(1, -20, 0, 50)
+dragInfo.Position = UDim2.new(0, 10, 0, 50)
+dragInfo.Text = "按住 👑 按鈕可以拖動\n按住主窗口標題欄可以拖動窗口"
+dragInfo.TextColor3 = Color3.fromRGB(150, 200, 255)
+dragInfo.BackgroundTransparency = 1
+dragInfo.Font = Enum.Font.Gotham
+dragInfo.TextSize = 14
+dragInfo.TextWrapped = true
+dragInfo.LineHeight = 1.3
+
+local creditsLabel = Instance.new("TextLabel", settingsTab)
+creditsLabel.Size = UDim2.new(1, -20, 0, 80)
+creditsLabel.Position = UDim2.new(0, 10, 0, 110)
+creditsLabel.Text = "玄丛腳本 v9.8\nShadowLib UI 系統\n製作者: 秦始皇\n主要功能: 快速攻擊、腳本加載"
+creditsLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+creditsLabel.BackgroundTransparency = 1
+creditsLabel.Font = Enum.Font.Gotham
+creditsLabel.TextSize = 14
+creditsLabel.TextWrapped = true
+creditsLabel.LineHeight = 1.3
+
+-- ========================
+-- 窗口標題欄
+-- ========================
+local titleBar = Instance.new("Frame", window.Main)
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
+titleBar.BackgroundTransparency = 0.3
+titleBar.BorderSizePixel = 0
+
+local titleText = Instance.new("TextLabel", titleBar)
+titleText.Size = UDim2.new(1, -50, 1, 0)
+titleText.Position = UDim2.new(0, 15, 0, 0)
+titleText.Text = "玄丛腳本 v9.8"
+titleText.TextColor3 = Color3.fromRGB(255, 215, 0)
+titleText.BackgroundTransparency = 1
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 16
+titleText.TextXAlignment = "Left"
+titleText.TextYAlignment = "Center"
+
+-- 窗口關閉按鈕
+local closeBtn = Instance.new("TextButton", titleBar)
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -12.5)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+closeBtn.BackgroundTransparency = 0.5
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 18
+closeBtn.AutoButtonColor = true
+
+local closeCorner = Instance.new("UICorner", closeBtn)
+closeCorner.CornerRadius = UDim.new(0.2, 0)
+
+local closeStroke = Instance.new("UIStroke", closeBtn)
+closeStroke.Color = Color3.fromRGB(80, 80, 100)
+closeStroke.Thickness = 1.5
+
+closeBtn.MouseButton1Click:Connect(function()
+    window.Main.Visible = false
+end)
+
+closeBtn.MouseEnter:Connect(function()
+    closeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    closeBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+    closeStroke.Color = Color3.fromRGB(100, 100, 120)
+end)
+
+closeBtn.MouseLeave:Connect(function()
+    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeStroke.Color = Color3.fromRGB(80, 80, 100)
+end)
+
+-- 讓標題欄可拖動
+library:AddDrag(titleBar)
+
+-- ========================
+-- ESC鍵關閉功能
+-- ========================
+if not isMobile then
+    uis.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.Escape then
+            if window.Main and window.Main.Visible then
+                window.Main.Visible = false
+            end
+        end
+    end)
+end
+
+-- ========================
+-- 初始化完成
+-- ========================
+print("🎮 =================================")
+print("🎮 玄丛腳本 v9.8 - ShadowLib風格")
+print("🎮 設備: " .. deviceType)
+print("🎮 功能特色:")
+print("🎮   ✅ G八中心標題")
+print("🎮   ✅ 主頁右上角關閉按鈕")
+print("🎮   ✅ PC支持此腳本")
+print("🎮   ✅ 腳本頁面：皮腳本、XA腳本")
+print("🎮   ✅ 功能頁面：快速攻擊、飛行腳本、FPS優化、自動V4")
+print("🎮   ✅ 皇冠開關按鈕 👑 (55x55)")
+print("🎮   ✅ 完整的快速攻擊代碼")
+print("🎮   ✅ 增大文字 - 更清晰易讀")
+print("🎮   ✅ 窗口大小: 500x320")
+print("🎮   ✅ 雙重關閉按鈕 (主頁+窗口)")
+print("🎮 =================================")
+
+print("🚀 腳本加載完成！")
+print("🎮 G八中心 - 主頁")
+print("📁 腳本頁面 (2個腳本):")
+print("   📜 皮腳本")
+print("   📜 XA腳本")
+print("⚙️ 功能頁面 (4個功能):")
+print("   ⚡ 快速攻擊")
+print("   ✈️ 飛行腳本")
+print("   🖥️ FPS優化")
+print("   🌀 自動V4")
+print("💡 屏幕左上角有 👑 皇冠按鈕")
+print("💡 點擊 👑 按鈕打開主界面")
+                          
