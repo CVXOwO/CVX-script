@@ -776,7 +776,7 @@ end)
 
 -- 飛行腳本功能
 local flightBtn, flightStatus, flightIcon = createFunctionButton("飛行腳本 [未加載]", functionsTab, function(btn, status, icon)
-    loadScript("飛行腳本", "https://raw.githubusercontent.com/iqiq180jash-afk/Xuan/refs/heads/main/%E9%A3%9B%E8%A1%8C", btn, icon)
+    loadScript("飛行腳本", "https://raw.githubusercontent.com/CVXOwO/CVX-script/refs/heads/main/cvx%20fly%20script?token=GHSAT0AAAAAADRWCEU5TNBY5ETYBBRAKVKQ2K7ULPQ", btn, icon)
 end)
 
 -- FPS優化功能
