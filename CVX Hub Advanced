@@ -450,7 +450,7 @@ local function createFunctionButton(name, parent, callback)
 end
 
 -- ========================
--- 主頁內容 (修改：添加G八中心標題和右上角關閉按鈕)
+-- 主頁內容 (修改：添加控制中心標題和右上角關閉按鈕)
 -- ========================
 -- 創建主頁頂部標題欄
 local mainHeader = Instance.new("Frame", mainTab)
@@ -462,11 +462,11 @@ mainHeader.BackgroundTransparency = 0.3
 mainHeader.BorderSizePixel = 0
 Instance.new("UICorner", mainHeader)
 
--- G八中心標題 (置中)
+-- 控制中心標題 (置中)
 local g8CenterTitle = Instance.new("TextLabel", mainHeader)
 g8CenterTitle.Size = UDim2.new(0.7, 0, 1, 0)
 g8CenterTitle.Position = UDim2.new(0.15, 0, 0, 0)
-g8CenterTitle.Text = "🎮 G八中心"
+g8CenterTitle.Text = "🎮 控制中心"
 g8CenterTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 g8CenterTitle.BackgroundTransparency = 1
 g8CenterTitle.Font = Enum.Font.GothamBold
