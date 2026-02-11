@@ -1,0 +1,818 @@
+-- 人挤人脚本（强化版）- 扩大范围与攻击速度
+-- 修改：攻击范围上限扩大至 99999，攻击速度最小降至 0.00001
+-- 2025-12-25 for hp1708-bit (增强版)
+
+-- 基础服务
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = Workspace.CurrentCamera
+
+-- 关闭摄像机震动（防抖）
+pcall(function()
+    local ok, main = pcall(function()
+        return require(ReplicatedStorage:FindFirstChild("Util") and ReplicatedStorage.Util:FindFirstChild("CameraShaker") and ReplicatedStorage.Util.CameraShaker:FindFirstChild("Main") or nil)
+    end)
+    if ok and type(main) == "table" then
+        local returnnil = function() return nil end
+        main.StartShake = returnnil
+        main.ShakeOnce = returnnil
+        main.ShakeSustain = returnnil
+        main.CameraShakeInstance = returnnil
+        main.Shake = returnnil
+        main.Start = returnnil
+    end
+end)
+
+-- 通知加载
+pcall(function()
+    StarterGui:SetCore("SendNotification",{
+        Title = "人挤人脚本 - 增强版",
+        Text = "加载中... 范围:99999 攻速:0.00001",
+        Duration = 3,
+    })
+end)
+
+-- 全局设置
+local _ENV = (getgenv or getrenv or getfenv)()
+local MIN_CLICK_DELAY = 0.00001  -- 从 0.0005 改为 0.00001（更快）
+local MAX_CLICK_DELAY = 10       -- 最大延迟也可以调整
+local Settings = {AutoClick = true, ClickDelay = MIN_CLICK_DELAY}
+local _G = _G or getfenv(0)._G
+_G.FastAttack = _G.FastAttack ~= nil and _G.FastAttack or true
+
+-- Helper
+local function SafeWaitForChild(parent, childName, timeout)
+    timeout = timeout or 10
+    local ok, res = pcall(function() return parent:WaitForChild(childName, timeout) end)
+    if ok then return res end
+    return nil
+end
+
+local function IsAlive(character)
+    if not character then return false end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health and humanoid.Health > 0
+end
+
+local function GetRandomValidPart(target)
+    if not target then return nil end
+    local allParts = target:GetDescendants()
+    local validParts = {}
+    local humanoidRootPart = target:FindFirstChild("HumanoidRootPart")
+    local boneParts = humanoidRootPart and humanoidRootPart.Parent and humanoidRootPart.Parent:GetDescendants() or {}
+    for _, part in ipairs(allParts) do
+        if part:IsA("BasePart") and part.CanCollide and table.find(boneParts, part) then
+            table.insert(validParts, part)
+        end
+    end
+    return #validParts > 0 and validParts[math.random(1, #validParts)] or target:FindFirstChild("HumanoidRootPart")
+end
+
+-- 检索核心组件（阻塞重试）
+local function CheckAndGetCoreComponents()
+    local Remotes, Modules, Net, RegisterAttack, RegisterHit, Enemies = nil, nil, nil, nil, nil, nil
+    while true do
+        Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes", 2)
+        Modules = SafeWaitForChild(ReplicatedStorage, "Modules", 2)
+        Net = Modules and SafeWaitForChild(Modules, "Net", 2) or nil
+        RegisterAttack = Net and SafeWaitForChild(Net, "RE/RegisterAttack", 2) or nil
+        RegisterHit = Net and SafeWaitForChild(Net, "RE/RegisterHit", 2) or nil
+        Enemies = SafeWaitForChild(Workspace, "Enemies", 2)
+        if Remotes and Modules and Net and RegisterAttack and RegisterHit and Enemies then
+            return Remotes, Net, RegisterAttack, RegisterHit, Enemies
+        end
+        task.wait(1)
+    end
+end
+
+-- FastAttack 模块（范围扩大到 99999）
+local Module = {}
+Module.FastAttack = (function()
+    if _ENV.rz_FastAttack then return _ENV.rz_FastAttack end
+    local FastAttack = {
+        Distance = 99999,  -- 最大范围从 5000 改为 99999
+        attackMobs = true,
+        attackPlayers = true,
+        Equipped = nil,
+        IsRunning = _G.FastAttack,
+        consecutiveFailures = 0,
+        maxConsecutiveFailures = 5,
+        MaxDistance = 99999,  -- 添加最大距离限制
+        MinClickDelay = MIN_CLICK_DELAY  -- 最小点击延迟
+    }
+
+    local function ProcessEnemies(OthersEnemies, Folder)
+        if not Folder or not FastAttack.attackMobs then return nil end
+        local BasePart = nil
+        for _, Enemy in ipairs(Folder:GetChildren()) do
+            if Enemy == LocalPlayer.Character or not IsAlive(Enemy) then continue end
+            local foundPart = GetRandomValidPart(Enemy)
+            if foundPart and LocalPlayer:DistanceFromCharacter(foundPart.Position) < FastAttack.Distance then
+                table.insert(OthersEnemies, {Enemy, foundPart})
+                BasePart = foundPart
+            end
+        end
+        return BasePart
+    end
+
+    local function ProcessRealPlayers(OthersEnemies)
+        if not FastAttack.attackPlayers then return nil end
+        local BasePart = nil
+        for _, OtherPlayer in ipairs(Players:GetPlayers()) do
+            if OtherPlayer == LocalPlayer then continue end
+            local OtherChar = OtherPlayer.Character
+            if not IsAlive(OtherChar) then continue end
+            local foundPart = GetRandomValidPart(OtherChar)
+            if foundPart and LocalPlayer:DistanceFromCharacter(foundPart.Position) < FastAttack.Distance then
+                table.insert(OthersEnemies, {OtherChar, foundPart})
+                BasePart = foundPart
+            end
+        end
+        return BasePart
+    end
+
+    function FastAttack:Attack(BasePart, OthersEnemies)
+        local _, Net, temp_RegisterAttack, temp_RegisterHit, _ = CheckAndGetCoreComponents()
+        if not (BasePart and OthersEnemies and #OthersEnemies > 0 and temp_RegisterAttack and temp_RegisterHit) then
+            self.consecutiveFailures = self.consecutiveFailures + 1
+            if self.consecutiveFailures >= self.maxConsecutiveFailures then
+                self.consecutiveFailures = 0
+                self.Equipped = LocalPlayer.Character and IsAlive(LocalPlayer.Character) and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            end
+            task.delay(0.1, function() self:AttackNearest() end)
+            return
+        end
+        self.consecutiveFailures = 0
+        
+        -- 使用更快的攻击速度
+        local attackDelay = Settings.ClickDelay or self.MinClickDelay
+        if attackDelay < self.MinClickDelay then
+            attackDelay = self.MinClickDelay
+        end
+        
+        temp_RegisterAttack:FireServer(attackDelay)
+        temp_RegisterHit:FireServer(BasePart, OthersEnemies)
+    end
+
+    function FastAttack:AttackNearest()
+        if not self.IsRunning then return end
+        local _, _, _, _, Enemies = CheckAndGetCoreComponents()
+        local OthersEnemies = {}
+        local Part1 = ProcessEnemies(OthersEnemies, Enemies)
+        local Part2 = ProcessRealPlayers(OthersEnemies)
+        if #OthersEnemies > 0 then
+            self:Attack(Part1 or Part2, OthersEnemies)
+        end
+    end
+
+    function FastAttack:BladeHits()
+        if not self.IsRunning then return end
+        local Equipped = LocalPlayer.Character and IsAlive(LocalPlayer.Character) and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if Equipped and Equipped.ToolTip ~= "Gun" then
+            self:AttackNearest()
+        end
+    end
+
+    task.spawn(function()
+        while true do
+            local delay = Settings.ClickDelay
+            if delay < MIN_CLICK_DELAY then
+                delay = MIN_CLICK_DELAY
+            end
+            task.wait(delay)
+            if Settings.AutoClick and FastAttack.IsRunning then
+                FastAttack:BladeHits()
+            else
+                task.wait(0.1)
+            end
+        end
+    end)
+
+    _ENV.rz_FastAttack = FastAttack
+    return FastAttack
+end)()
+
+-- 恢复逻辑（确保模块存在）
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if not _ENV.rz_FastAttack then
+            while not _ENV.rz_FastAttack do
+                task.wait(0.5)
+                if _G.FastAttack then
+                    _ENV.rz_FastAttack = Module.FastAttack or _ENV.rz_FastAttack
+                end
+            end
+        end
+    end
+end)
+
+-- 自动 v4（示例，调用 Backpack 内 Awakening.RemoteFunction）
+local function callAwakeningRemote()
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not Backpack then return end
+    local Awakening = Backpack:FindFirstChild("Awakening")
+    if not Awakening then return end
+    local RemoteFunc = Awakening:FindFirstChild("RemoteFunction")
+    if not RemoteFunc or not RemoteFunc:IsA("RemoteFunction") then return end
+    pcall(function() RemoteFunc:InvokeServer(true) end)
+end
+
+-- 移动加速（TranslateBy 方法）
+getfenv().translateSpeed = 50
+getfenv().translateAccelEnabled = false
+getfenv().translateConnection = nil
+
+local function enableTranslateAccel(enabled)
+    getfenv().translateAccelEnabled = enabled
+    if enabled then
+        if getfenv().translateConnection then getfenv().translateConnection:Disconnect(); getfenv().translateConnection = nil end
+        getfenv().translateConnection = RunService.Heartbeat:Connect(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+                local humanoid = char.Humanoid
+                if humanoid.MoveDirection.Magnitude > 0 then
+                    local moveDirection = humanoid.MoveDirection
+                    local acceleration = moveDirection * (getfenv().translateSpeed or 50) / 30
+                    char:TranslateBy(acceleration)
+                end
+            end
+        end)
+    else
+        if getfenv().translateConnection then getfenv().translateConnection:Disconnect(); getfenv().translateConnection = nil end
+    end
+end
+
+-- ESP 功能（名称/血量/射线）
+local ESPConfig = {
+    MainSwitch = false,
+    ShowNameDistance = false,
+    ShowTracer = false,
+    ShowHealth = false
+}
+
+local ESPElements = {}
+
+local function CleanupPlayerESP(player)
+    if not ESPElements[player.UserId] then return end
+    local e = ESPElements[player.UserId]
+    if e.NameHealthESP then
+        pcall(function() e.NameHealthESP:Destroy() end)
+        e.NameHealthESP = nil
+    end
+    if e.NameHealthUpdateConn then
+        pcall(function() e.NameHealthUpdateConn:Disconnect() end)
+        e.NameHealthUpdateConn = nil
+    end
+    if e.Tracer then
+        pcall(function() e.Tracer:Remove() end)
+        e.Tracer = nil
+    end
+    if e.TracerConn then
+        pcall(function() e.TracerConn:Disconnect() end)
+        e.TracerConn = nil
+    end
+    ESPElements[player.UserId] = nil
+end
+
+local function CreateNameDistanceHealthESP(player)
+    if not player.Character or not player.Character:FindFirstChild("Head") then return end
+    local head = player.Character.Head
+    if ESPElements[player.UserId] and ESPElements[player.UserId].NameHealthESP then
+        ESPElements[player.UserId].NameHealthESP:Destroy()
+    end
+
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "NameDistanceHealthESP"
+    billboardGui.Adornee = head
+    billboardGui.Size = UDim2.new(0, 120, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Parent = head
+
+    local nameLabel = Instance.new("TextLabel", billboardGui)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.Size = UDim2.new(1, 0, 0, 16)
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamSemibold
+
+    local healthLabel = Instance.new("TextLabel", billboardGui)
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.Position = UDim2.new(0, 0, 0.33, 0)
+    healthLabel.Size = UDim2.new(1, 0, 0, 16)
+    healthLabel.TextColor3 = Color3.new(0, 1, 0)
+    healthLabel.TextScaled = true
+    healthLabel.Font = Enum.Font.Gotham
+
+    local distanceLabel = Instance.new("TextLabel", billboardGui)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Position = UDim2.new(0, 0, 0.66, 0)
+    distanceLabel.Size = UDim2.new(1, 0, 0, 16)
+    distanceLabel.TextColor3 = Color3.new(1, 0.5, 0)
+    distanceLabel.TextScaled = true
+    distanceLabel.Font = Enum.Font.Gotham
+
+    local updateConnection = RunService.RenderStepped:Connect(function()
+        if not billboardGui.Parent or not LocalPlayer.Character or not player.Character then return end
+        local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+        if localRoot and targetRoot then
+            local distance = (localRoot.Position - targetRoot.Position).Magnitude
+            distanceLabel.Text = string.format("%.1f米", distance)
+        end
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            local health = math.floor(humanoid.Health)
+            local maxHealth = math.floor(humanoid.MaxHealth)
+            local healthPercent = (maxHealth > 0) and (health / maxHealth) or 0
+            if healthPercent > 0.7 then
+                healthLabel.TextColor3 = Color3.new(0, 1, 0)
+            elseif healthPercent > 0.3 then
+                healthLabel.TextColor3 = Color3.new(1, 1, 0)
+            else
+                healthLabel.TextColor3 = Color3.new(1, 0, 0)
+            end
+            healthLabel.Text = string.format("血量: %d/%d", health, maxHealth)
+        end
+    end)
+
+    ESPElements[player.UserId] = ESPElements[player.UserId] or {}
+    ESPElements[player.UserId].NameHealthESP = billboardGui
+    ESPElements[player.UserId].NameHealthUpdateConn = updateConnection
+end
+
+local function CreateTracerESP(player)
+    if ESPElements[player.UserId] and ESPElements[player.UserId].Tracer then
+        pcall(function() ESPElements[player.UserId].Tracer:Remove() end)
+    end
+    local tracer = Drawing.new("Line")
+    tracer.Color = Color3.new(1, 0, 0)
+    tracer.Thickness = 2
+    tracer.Transparency = 0.8
+    tracer.Visible = false
+
+    local renderConnection = RunService.RenderStepped:Connect(function()
+        if not ESPConfig.MainSwitch or not ESPConfig.ShowTracer then
+            tracer.Visible = false
+            return
+        end
+        local localChar = LocalPlayer.Character
+        local targetChar = player.Character
+        if not localChar or not targetChar then tracer.Visible = false; return end
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        if targetRoot then
+            local screenPos, isVisible = Camera:WorldToViewportPoint(targetRoot.Position)
+            if isVisible then
+                tracer.Visible = true
+                tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+            else
+                tracer.Visible = false
+            end
+        else
+            tracer.Visible = false
+        end
+    end)
+
+    ESPElements[player.UserId] = ESPElements[player.UserId] or {}
+    ESPElements[player.UserId].Tracer = tracer
+    ESPElements[player.UserId].TracerConn = renderConnection
+end
+
+local function UpdatePlayerESP(player)
+    if player == LocalPlayer then return end
+    if not player.Character then
+        CleanupPlayerESP(player)
+        return
+    end
+    if not player.Character:FindFirstChild("Head") or not player.Character:FindFirstChild("HumanoidRootPart") then
+        CleanupPlayerESP(player)
+        return
+    end
+    if ESPConfig.MainSwitch then
+        if ESPConfig.ShowTracer then CreateTracerESP(player) end
+        if ESPConfig.ShowNameDistance or ESPConfig.ShowHealth then
+            CreateNameDistanceHealthESP(player)
+        else
+            if ESPElements[player.UserId] and ESPElements[player.UserId].NameHealthESP then
+                pcall(function() ESPElements[player.UserId].NameHealthESP:Destroy() end)
+                ESPElements[player.UserId].NameHealthESP = nil
+            end
+            if ESPElements[player.UserId] and ESPElements[player.UserId].NameHealthUpdateConn then
+                pcall(function() ESPElements[player.UserId].NameHealthUpdateConn:Disconnect() end)
+                ESPElements[player.UserId].NameHealthUpdateConn = nil
+            end
+        end
+    else
+        CleanupPlayerESP(player)
+    end
+end
+
+local function UpdateAllESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            UpdatePlayerESP(player)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player == LocalPlayer then return end
+    if player.Character then
+        task.spawn(function() task.wait(0.5); UpdatePlayerESP(player) end)
+    end
+    player.CharacterAdded:Connect(function() task.spawn(function() task.wait(0.5); UpdatePlayerESP(player) end) end)
+    player.CharacterRemoving:Connect(function() CleanupPlayerESP(player) end)
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    UpdateAllESP()
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(3)
+        if ESPConfig.MainSwitch then UpdateAllESP() end
+    end
+end)
+
+-- 传送快捷函数（示例）
+local function TeleportTo(position)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(position)
+    end
+end
+
+-- GUI：在 PlayerGui 中创建一个可拖动面板
+local function createGui()
+    -- 防止重复创建
+    local existing = PlayerGui:FindFirstChild("RenJiRenCenterGui")
+    if existing then existing:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "RenJiRenCenterGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = PlayerGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "MainFrame"
+    frame.Size = UDim2.new(0, 460, 0, 420)
+    frame.Position = UDim2.new(0.02, 0, 0.1, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    frame.AnchorPoint = Vector2.new(0,0)
+    frame.Active = true
+    frame.Draggable = true
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 28)
+    title.Position = UDim2.new(0,0,0,0)
+    title.BackgroundTransparency = 1
+    title.Text = "人挤人中心 - GUI (增强版)"
+    title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+
+    -- Close/Hide button (仍然可用)
+    local closeBtn = Instance.new("TextButton", frame)
+    closeBtn.Size = UDim2.new(0, 28, 0, 20)
+    closeBtn.Position = UDim2.new(1, -34, 0, 4)
+    closeBtn.Text = "X"
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui.Enabled = not screenGui.Enabled
+    end)
+
+    -- 左列 container
+    local left = Instance.new("Frame", frame)
+    left.Size = UDim2.new(0, 220, 1, -36)
+    left.Position = UDim2.new(0, 8, 0, 36)
+    left.BackgroundTransparency = 1
+
+    -- 右列 container
+    local right = Instance.new("Frame", frame)
+    right.Size = UDim2.new(0, 220, 1, -36)
+    right.Position = UDim2.new(0, 232, 0, 36)
+    right.BackgroundTransparency = 1
+
+    local function makeLabel(parent, y, text)
+        local lbl = Instance.new("TextLabel", parent)
+        lbl.Size = UDim2.new(1, -8, 0, 18)
+        lbl.Position = UDim2.new(0, 4, 0, y)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = Color3.fromRGB(220,220,220)
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 14
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        return lbl
+    end
+
+    local function makeButton(parent, y, text, cb)
+        local btn = Instance.new("TextButton", parent)
+        btn.Size = UDim2.new(1, -8, 0, 26)
+        btn.Position = UDim2.new(0, 4, 0, y)
+        btn.Text = text
+        btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.MouseButton1Click:Connect(function() pcall(cb) end)
+        return btn
+    end
+
+    local function makeToggle(parent, y, text, initial, cb)
+        makeLabel(parent, y, text)
+        local tog = Instance.new("TextButton", parent)
+        tog.Size = UDim2.new(0, 60, 0, 20)
+        tog.Position = UDim2.new(1, -68, 0, y)
+        tog.Text = initial and "ON" or "OFF"
+        tog.BackgroundColor3 = initial and Color3.fromRGB(60,150,60) or Color3.fromRGB(120,120,120)
+        tog.TextColor3 = Color3.new(1,1,1)
+        tog.Font = Enum.Font.GothamBold
+        tog.TextSize = 12
+        local state = initial
+        tog.MouseButton1Click:Connect(function()
+            state = not state
+            tog.Text = state and "ON" or "OFF"
+            tog.BackgroundColor3 = state and Color3.fromRGB(60,150,60) or Color3.fromRGB(120,120,120)
+            pcall(function() cb(state) end)
+        end)
+        return tog
+    end
+
+    -- 左侧控件（脚本功能）
+    local y = 0
+    makeLabel(left, y, "摄像机缩放 (CameraMaxZoomDistance)：")
+    y = y + 20
+    local camBox = Instance.new("TextBox", left)
+    camBox.Size = UDim2.new(1, -8, 0, 22)
+    camBox.Position = UDim2.new(0, 4, 0, y)
+    camBox.Text = tostring(LocalPlayer.CameraMaxZoomDistance or 128)
+    camBox.PlaceholderText = "输入数字后按回车或失去焦点"
+    camBox.ClearTextOnFocus = false
+    camBox.FocusLost:Connect(function(enter)
+        local v = tonumber(camBox.Text)
+        if v then
+            LocalPlayer.CameraMaxZoomDistance = v
+        end
+    end)
+    y = y + 36
+
+    makeLabel(left, y, "自动 v4（每秒调用一次）:")
+    y = y + 18
+    local autoV4State = false
+    local autoV4Task = nil
+    local autoV4Toggle = makeToggle(left, y-18, "自动 v4", false, function(state)
+        autoV4State = state
+        if autoV4Task then task.cancel(autoV4Task); autoV4Task = nil end
+        if state then
+            autoV4Task = task.spawn(function()
+                while autoV4State do
+                    callAwakeningRemote()
+                    task.wait(1)
+                end
+            end)
+        end
+    end)
+    y = y + 36
+
+    -- 快速攻击（范围）- 修改为 99999
+    makeLabel(left, y, "快速攻击：开关 / 范围 (1 - 99999)")
+    y = y + 20
+    local fastToggle = makeToggle(left, y-20, "开关", _G.FastAttack, function(state)
+        if _ENV.rz_FastAttack then
+            _ENV.rz_FastAttack.IsRunning = state
+            _G.FastAttack = state
+        else
+            _G.FastAttack = state
+        end
+    end)
+
+    local rangeBox = Instance.new("TextBox", left)
+    rangeBox.Size = UDim2.new(1, -72, 0, 22)
+    rangeBox.Position = UDim2.new(0, 4, 0, y)
+    rangeBox.Text = tostring((_ENV.rz_FastAttack and _ENV.rz_FastAttack.Distance) or 99999)
+    rangeBox.PlaceholderText = "输入范围 (1-99999)"
+    rangeBox.ClearTextOnFocus = false
+
+    local setRangeBtn = Instance.new("TextButton", left)
+    setRangeBtn.Size = UDim2.new(0, 60, 0, 22)
+    setRangeBtn.Position = UDim2.new(1, -64, 0, y)
+    setRangeBtn.Text = "设置"
+    setRangeBtn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    setRangeBtn.TextColor3 = Color3.new(1,1,1)
+    setRangeBtn.MouseButton1Click:Connect(function()
+        local num = tonumber(rangeBox.Text) or 99999
+        num = math.floor(math.clamp(num, 1, 99999))
+        if _ENV.rz_FastAttack then
+            _ENV.rz_FastAttack.Distance = num
+        else
+            if Module.FastAttack then Module.FastAttack.Distance = num end
+        end
+        rangeBox.Text = tostring(num)
+    end)
+    y = y + 36
+
+    -- 攻速设置（最小值 0.00001）
+    makeLabel(left, y, string.format("攻速 ClickDelay (%.6f - %.1f 秒)", MIN_CLICK_DELAY, MAX_CLICK_DELAY))
+    y = y + 18
+    local cdBox = Instance.new("TextBox", left)
+    cdBox.Size = UDim2.new(1, -8, 0, 22)
+    cdBox.Position = UDim2.new(0, 4, 0, y)
+    cdBox.Text = tostring(Settings.ClickDelay)
+    cdBox.ClearTextOnFocus = false
+    cdBox.FocusLost:Connect(function()
+        local num = tonumber(cdBox.Text) or MIN_CLICK_DELAY
+        if num < MIN_CLICK_DELAY then num = MIN_CLICK_DELAY end
+        if num > MAX_CLICK_DELAY then num = MAX_CLICK_DELAY end
+        Settings.ClickDelay = num
+        cdBox.Text = tostring(num)
+        
+        if _ENV.rz_FastAttack then
+            _ENV.rz_FastAttack.MinClickDelay = MIN_CLICK_DELAY
+        end
+    end)
+    y = y + 36
+
+    -- 移速设置
+    makeLabel(left, y, "移动加速：速度值")
+    y = y + 18
+    local speedBox = Instance.new("TextBox", left)
+    speedBox.Size = UDim2.new(1, -72, 0, 22)
+    speedBox.Position = UDim2.new(0, 4, 0, y)
+    speedBox.Text = tostring(getfenv().translateSpeed or 50)
+    speedBox.ClearTextOnFocus = false
+    local speedSetBtn = Instance.new("TextButton", left)
+    speedSetBtn.Size = UDim2.new(0, 60, 0, 22)
+    speedSetBtn.Position = UDim2.new(1, -64, 0, y)
+    speedSetBtn.Text = "设置"
+    speedSetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    speedSetBtn.TextColor3 = Color3.new(1,1,1)
+    speedSetBtn.MouseButton1Click:Connect(function()
+        local v = tonumber(speedBox.Text)
+        if v then getfenv().translateSpeed = v end
+    end)
+    y = y + 36
+
+    local speedToggle = makeToggle(left, y-36, "加速开关", false, function(state)
+        enableTranslateAccel(state)
+    end)
+    y = y + 48
+
+    -- 右侧：ESP / 传送 / 外部脚本
+    local ry = 0
+    makeLabel(right, ry, "ESP 设置")
+    ry = ry + 20
+    local espToggle = makeToggle(right, ry-20, "ESP 总开关", ESPConfig.MainSwitch, function(state)
+        ESPConfig.MainSwitch = state
+        UpdateAllESP()
+    end)
+    ry = ry + 36
+    local espNameToggle = makeToggle(right, ry-36, "显示 名字+距离", ESPConfig.ShowNameDistance, function(state)
+        ESPConfig.ShowNameDistance = state
+        UpdateAllESP()
+    end)
+    ry = ry + 36
+    local espHealthToggle = makeToggle(right, ry-72, "显示 血量", ESPConfig.ShowHealth, function(state)
+        ESPConfig.ShowHealth = state
+        UpdateAllESP()
+    end)
+    ry = ry + 36
+    local espTracerToggle = makeToggle(right, ry-108, "射线追踪(中心)", ESPConfig.ShowTracer, function(state)
+        ESPConfig.ShowTracer = state
+        UpdateAllESP()
+    end)
+    ry = ry + 48
+
+    -- 传送按钮示例
+    makeLabel(right, ry, "传送")
+    ry = ry + 20
+    makeButton(right, ry, "传送至一海", function() pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelMain") end) end)
+    ry = ry + 32
+    makeButton(right, ry, "传送至二海", function() pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelDressrosa") end) end)
+    ry = ry + 32
+    makeButton(right, ry, "传送至三海", function() pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelZou") end) end)
+    ry = ry + 40
+
+    -- 传送自定义位置示例
+    makeButton(right, ry, "传送：天鹅的房间", function()
+        TeleportTo(Vector3.new(-287.37, 305.81, 592.98))
+    end)
+    ry = ry + 32
+    makeButton(right, ry, "传送：豪宅", function()
+        TeleportTo(Vector3.new(2286.93, 15.06, 910.51))
+    end)
+    ry = ry + 40
+
+    -- 外部脚本加载（按需）
+    makeLabel(right, ry, "外部脚本（可能不可用）")
+    ry = ry + 22
+    makeButton(right, ry, "飞行 脚本", function()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/kismile236/rjrym/refs/heads/main/fly.lua"))() end)
+    end)
+    ry = ry + 32
+    makeButton(right, ry, "fps 优化", function()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/kismile236/rjrym/refs/heads/main/fpsboost"))() end)
+    end)
+    ry = ry + 32
+    makeButton(right, ry, "hoho UI", function()
+        pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/acsu123/HOHO_H/main/Loading_UI'))() end)
+    end)
+    ry = ry + 40
+
+    -- 状态显示栏
+    local statusLabel = Instance.new("TextLabel", frame)
+    statusLabel.Size = UDim2.new(1, -8, 0, 18)
+    statusLabel.Position = UDim2.new(0, 4, 1, -22)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 12
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- 更新状态显示
+    spawn(function()
+        while true do
+            pcall(function()
+                local running = (_ENV.rz_FastAttack and tostring(_ENV.rz_FastAttack.IsRunning) or tostring(_G.FastAttack))
+                local dist = (_ENV.rz_FastAttack and tostring(_ENV.rz_FastAttack.Distance) or (Module.FastAttack and tostring(Module.FastAttack.Distance) or "99999"))
+                local esp = tostring(ESPConfig.MainSwitch)
+                local delay = string.format("%.6f", Settings.ClickDelay)
+                statusLabel.Text = string.format("FastAttack: %s  范围: %s  ESP: %s  攻速: %s", running, dist, esp, delay)
+            end)
+            task.wait(0.5)
+        end
+    end)
+
+    return screenGui
+end
+
+-- 创建 GUI
+local gui = createGui()
+gui.Enabled = true -- 默认开启
+
+-- 可随时开/关功能：按 Insert 切换（可修改为其他 KeyCode）
+local toggleKey = Enum.KeyCode.Insert
+-- 程序化访问与快捷函数
+getgenv().RenJiRenGUI = gui
+getgenv().ToggleRenJiGui = function()
+    if gui and gui.Parent then
+        gui.Enabled = not gui.Enabled
+    end
+end
+
+-- 键盘监听：按 Insert 隐藏/显示（当正在输入文本时不会触发）
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == toggleKey then
+        -- 如果焦点在文本输入框上则忽略（避免在输入数值时误触）
+        if UserInputService:GetFocusedTextBox() then return end
+        if gui and gui.Parent then
+            gui.Enabled = not gui.Enabled
+            -- 简短通知（可注释掉）
+            pcall(function()
+                StarterGui:SetCore("SendNotification", {
+                    Title = "人挤人脚本",
+                    Text = gui.Enabled and "面板已打开（Insert）" or "面板已关闭（Insert）",
+                    Duration = 2
+                })
+            end)
+        end
+    end
+end)
+
+-- 还可以通过 getgenv().ToggleRenJiGui() 程序化切换 GUI
+-- 例如：在命令行或其它脚本中执行：getgenv().ToggleRenJiGui()
+
+-- 启动提示
+pcall(function()
+    StarterGui:SetCore("SendNotification",{
+        Title = "人挤人脚本 - 增强版",
+        Text = "加载完成！范围:99999 攻速:0.00001 按 Insert 切换面板",
+        Duration = 5,
+    })
+end)
+
+-- 返回脚本环境（方便调试）
+return {
+    GUI = gui,
+    Toggle = getgenv().ToggleRenJiGui,
+    FastAttack = _ENV.rz_FastAttack or Module.FastAttack,
+    Settings = Settings,
+    ESPConfig = ESPConfig
+}
