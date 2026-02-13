@@ -118,8 +118,8 @@ AddButton(T_Scripts, "LX hub", function() loadstring(game:HttpGet("https://raw.g
 
 -- 戰鬥
 AddToggle(T_Combat, "開啟快速攻擊", "FastAttack")
-AddSlider(T_Combat, "攻擊速度", 0.01, 0.5, 0.1, true, function(v) getgenv().CaiHuaConfig.Settings.ClickDelay = v end)
-AddSlider(T_Combat, "攻擊範圍", 100, 5000, 500, false, function(v) getgenv().CaiHuaConfig.Settings.AtkRange = v end)
+AddSlider(T_Combat, "攻擊速度", 0.01, 0.5, 0.01, true, function(v) getgenv().CaiHuaConfig.Settings.ClickDelay = v end)
+AddSlider(T_Combat, "攻擊範圍", 100, 5000, 5000, false, function(v) getgenv().CaiHuaConfig.Settings.AtkRange = v end)
 AddToggle(T_Combat, "模式: 只打怪物", "AttackMonsters")
 AddToggle(T_Combat, "模式: 只打玩家", "AttackPlayers")
 AddToggle(T_Combat, "模式: 全都打", "AttackAll")
