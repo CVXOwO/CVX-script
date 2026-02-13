@@ -145,7 +145,7 @@ AddButton(T_TP, "传送至九头蛇", function() TPF(Vector3.new(-5027.03, 316.4
 -- 玩家
 AddToggle(T_Player, "自動 V4 覺醒", "AutoV4")
 AddSlider(T_Player, "視角 FOV", 70, 150, 70, false, function(v) getgenv().CaiHuaConfig.Settings.FOV = v end)
-AddToggle(T_Player, "修改速度", "SpeedActive"); AddSlider(T_Player, "速度", 16, 500, 16, false, function(v) getgenv().CaiHuaConfig.Settings.WalkSpd = v end)
+AddToggle(T_Player, "修改速度", "SpeedActive"); AddSlider(T_Player, "速度", 16, 500, 150, false, function(v) getgenv().CaiHuaConfig.Settings.WalkSpd = v end)
 AddToggle(T_Player, "修改跳躍", "JumpActive"); AddSlider(T_Player, "跳躍", 50, 600, 50, false, function(v) getgenv().CaiHuaConfig.Settings.JumpPower = v end)
 
 -- 透視 (維持大字體、單行變色)
