@@ -283,8 +283,8 @@ Yes.MouseButton1Click:Connect(function()
     SG:Destroy() -- 刪除 UI
 end)
 
--- 🥦 Broccoli
-local CaiHuaBtn = Instance.new("TextButton", SG); CaiHuaBtn.Size = UDim2.new(0, 60, 0, 60); CaiHuaBtn.Position = UDim2.new(0, 30, 0, 30); CaiHuaBtn.BackgroundColor3 = Color3.new(0,0,0); CaiHuaBtn.Text = "🥦"; CaiHuaBtn.TextSize = 35; Instance.new("UICorner", CaiHuaBtn).CornerRadius = UDim.new(1,0); ApplyROG(CaiHuaBtn, 4)
+-- 👑Crown
+local CaiHuaBtn = Instance.new("TextButton", SG); CaiHuaBtn.Size = UDim2.new(0, 60, 0, 60); CaiHuaBtn.Position = UDim2.new(0, 30, 0, 30); CaiHuaBtn.BackgroundColor3 = Color3.new(0,0,0); CaiHuaBtn.Text = "👑"; CaiHuaBtn.TextSize = 35; Instance.new("UICorner", CaiHuaBtn).CornerRadius = UDim.new(1,0); ApplyROG(CaiHuaBtn, 4)
 CaiHuaBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
 local function Drag(o) local g, s, sp; o.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = true; s = i.Position; sp = o.Position end end) o.InputChanged:Connect(function(i) if g and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local d = i.Position - s; o.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y) end end) o.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = false end end) end
 Drag(Main); Drag(MonF); Drag(CaiHuaBtn); Tabs[1].Visible = true; TabButtons[1].BackgroundColor3 = Color3.fromRGB(60, 60, 80)
