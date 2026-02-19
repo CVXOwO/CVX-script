@@ -56,7 +56,8 @@ local function AddButton(p, t, f)
 end
 
 local function AddToggle(p, t, f)
-    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 32); B.BackgroundColor3 = Color3.fromRGB(45, 45, 55); B.Text = t.." [OFF]"; B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
+    local isOn = getgenv().CVXConfig.Toggles[f]
+    local B = Instance.new("TextButton", p); B.Size = UDim2.new(0.95, 0, 0, 32); B.BackgroundColor3 = isOn and Color3.fromRGB(150, 40, 40) or Color3.fromRGB(45, 45, 55); B.Text = t..(isOn and " [ON]" or " [OFF]"); B.TextColor3 = Color3.new(1,1,1); B.Font = "GothamBold"; B.TextSize = 10; Instance.new("UICorner", B)
     B.MouseButton1Click:Connect(function() 
         getgenv().CVXConfig.Toggles[f] = not getgenv().CVXConfig.Toggles[f]
         B.Text = t..(getgenv().CVXConfig.Toggles[f] and " [ON]" or " [OFF]")
