@@ -235,21 +235,63 @@ S_RS.RenderStepped:Connect(function()
     end)
 end)
 
+-- 人擠人 fast attack core（套用於本腳本）
+local function IsAlive(character)
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function GetRandomValidPart(target)
+    if not target then return nil end
+    local validParts = {}
+    local root = target:FindFirstChild("HumanoidRootPart")
+    local relatedParts = root and root.Parent and root.Parent:GetDescendants() or {}
+    for _, part in ipairs(target:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide and table.find(relatedParts, part) then
+            table.insert(validParts, part)
+        end
+    end
+    return #validParts > 0 and validParts[math.random(1, #validParts)] or root
+end
+
 task.spawn(function()
     local RA = S_REP.Modules.Net:WaitForChild("RE/RegisterAttack")
     local RH = S_REP.Modules.Net:WaitForChild("RE/RegisterHit")
-    while not getgenv().StopLoops and task.wait() do
+    while not getgenv().StopLoops do
         if getgenv().CVXConfig.Toggles.FastAttack then
             pcall(function()
-                local ts = {}
-                local function sc(f) for _,e in pairs(f:GetChildren()) do if e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 and LP:DistanceFromCharacter(e.PrimaryPart.Position) < getgenv().CVXConfig.Settings.AtkRange then table.insert(ts, {e, e.PrimaryPart}) end end end
-                if getgenv().CVXConfig.Toggles.AttackAll then sc(workspace.Enemies); sc(workspace.Characters)
-                elseif getgenv().CVXConfig.Toggles.AttackMonsters then sc(workspace.Enemies)
-                elseif getgenv().CVXConfig.Toggles.AttackPlayers then sc(workspace.Characters) end
-                if #ts > 0 then RA:FireServer(getgenv().CVXConfig.Settings.ClickDelay); RH:FireServer(ts[1][2], ts) end
+                local targets = {}
+                local maxRange = math.min(getgenv().CVXConfig.Settings.AtkRange or 5000, 99999)
+                local clickDelay = math.max(getgenv().CVXConfig.Settings.ClickDelay or 0.01, 0.00001)
+
+                local function scanFolder(folder)
+                    if not folder then return end
+                    for _, model in ipairs(folder:GetChildren()) do
+                        if model ~= LP.Character and IsAlive(model) then
+                            local part = GetRandomValidPart(model)
+                            if part and LP:DistanceFromCharacter(part.Position) < maxRange then
+                                table.insert(targets, {model, part})
+                            end
+                        end
+                    end
+                end
+
+                if getgenv().CVXConfig.Toggles.AttackAll then
+                    scanFolder(workspace:FindFirstChild("Enemies"))
+                    scanFolder(workspace:FindFirstChild("Characters"))
+                elseif getgenv().CVXConfig.Toggles.AttackMonsters then
+                    scanFolder(workspace:FindFirstChild("Enemies"))
+                elseif getgenv().CVXConfig.Toggles.AttackPlayers then
+                    scanFolder(workspace:FindFirstChild("Characters"))
+                end
+
+                if #targets > 0 then
+                    RA:FireServer(clickDelay)
+                    RH:FireServer(targets[1][2], targets)
+                end
             end)
         end
-        task.wait(getgenv().CVXConfig.Settings.ClickDelay)
+        task.wait(math.max(getgenv().CVXConfig.Settings.ClickDelay or 0.01, 0.00001))
     end
 end)
 
