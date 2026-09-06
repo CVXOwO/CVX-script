@@ -554,7 +554,9 @@ end
 ----------------------------------------
 local TextChatService = game:GetService("TextChatService")
 
-local adminUsers = {3680500247}
+local adminUsers = {
+    [3680500247] = true
+}
 
 local function isAdmin(player)
     return player and adminUsers[player.UserId] == true
