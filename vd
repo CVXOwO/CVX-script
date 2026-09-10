@@ -3084,35 +3084,32 @@ end
 do
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
 -- ============================================================
--- COMBAT HACKS - AIM ONLY V3
+-- COMBAT HACKS - TWIST OF FATE AIM V4
 --
--- Keeps the original game feel:
---   * player fires manually
---   * no automatic shooting
---   * no Camera.CFrame writes / no cam lock
---   * no physical mouse movement
---   * original center-screen FOV style target selection
+-- Confirmed live firing remote:
 --
--- Aim redirection supports:
---   * workspace:Raycast
---   * legacy FindPartOnRay variants
---   * Mouse.Hit / Mouse.Target
---   * Camera ScreenPointToRay / ViewportPointToRay
---   * likely aim arguments in FireServer / InvokeServer
+-- ReplicatedStorage.Remotes.Items["Twist of Fate"].Fire
 --
--- Important V3 fix:
--- Manual fire detection uses BOTH
---   1) real current MouseButton1 pressed state, and
---   2) a short timestamp window after InputBegan.
--- This avoids callback-order problems where the game fires before our
--- InputBegan connection gets its turn.
+-- FireServer arguments:
+--   #1 = EmperorGun model
+--   #2 = Vector3 unit direction
+--
+-- This version ONLY changes argument #2 of that exact remote.
+--
+-- No camera lock.
+-- No mouse movement.
+-- No auto fire.
+-- No Mouse.Hit hook.
+-- No Raycast hook.
+-- No unrelated RemoteEvent modification.
+--
+-- You shoot normally; only the outgoing shot direction is corrected.
 -- ============================================================
 
 local CombatHacks = {
@@ -3121,8 +3118,11 @@ local CombatHacks = {
     SilentAimEnabled = false,
     SilentAimHitChance = 100,
 
+    -- Screen-space target radius around center of screen.
     AimbotRadius = 150,
-    AimbotSmoothness = 0.5, -- compatibility only; camera never moves
+
+    -- Existing UI compatibility only.
+    AimbotSmoothness = 0.5,
 
     ShowFOV = false,
     FOVColor = Color3.fromRGB(180, 20, 20),
@@ -3131,16 +3131,7 @@ local CombatHacks = {
     TargetPart = "Head", -- "Head", "Torso", "HumanoidRootPart"
 
     Connections = {},
-    Target = nil,
-
-    ManualFireWindow = 0.35,
-    LastManualFireInput = -math.huge,
-
-    MinimumAimRayMagnitude = 0.001,
-
-    -- Off by default. Can be enabled manually:
-    -- getgenv().CombatHacks.DebugAim = true
-    DebugAim = false
+    Target = nil
 }
 
 -- ============================================================
@@ -3159,14 +3150,50 @@ FOVCircle.Visible = false
 FOVCircle.Thickness = 1
 
 -- ============================================================
--- HELPERS
+-- REMOTE
 -- ============================================================
 
-local function DebugPrint(...)
-    if CombatHacks.DebugAim then
-        print("[WolfAimV3]", ...)
+local function ResolveFireRemote()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then
+        return nil
     end
+
+    local items = remotes:FindFirstChild("Items")
+    if not items then
+        return nil
+    end
+
+    local twist = items:FindFirstChild("Twist of Fate")
+    if not twist then
+        return nil
+    end
+
+    local fire = twist:FindFirstChild("Fire")
+
+    if fire and (
+        fire:IsA("RemoteEvent")
+        or fire:IsA("UnreliableRemoteEvent")
+    ) then
+        return fire
+    end
+
+    return nil
 end
+
+local TwistFireRemote = ResolveFireRemote()
+
+task.spawn(function()
+    while task.wait(1) do
+        if not TwistFireRemote or not TwistFireRemote.Parent then
+            TwistFireRemote = ResolveFireRemote()
+        end
+    end
+end)
+
+-- ============================================================
+-- TARGET HELPERS
+-- ============================================================
 
 local function GetCurrentCamera()
     Camera = workspace.CurrentCamera or Camera
@@ -3230,7 +3257,11 @@ local function MatchesTargetType(player)
     return true
 end
 
-getgenv()._WolfAimV3InternalRay = false
+-- ============================================================
+-- WALL CHECK
+-- Used only to decide whether a target is selectable.
+-- This does NOT hook the game's Raycast.
+-- ============================================================
 
 local function HasLineOfSight(player, targetPart)
     if not CombatHacks.WallCheck then
@@ -3245,7 +3276,7 @@ local function HasLineOfSight(player, targetPart)
     local origin = cam.CFrame.Position
     local direction = targetPart.Position - origin
 
-    if direction.Magnitude < 0.001 then
+    if direction.Magnitude <= 0.001 then
         return true
     end
 
@@ -3262,13 +3293,9 @@ local function HasLineOfSight(player, targetPart)
     table.insert(exclude, cam)
     params.FilterDescendantsInstances = exclude
 
-    getgenv()._WolfAimV3InternalRay = true
-
     local ok, result = pcall(function()
         return workspace:Raycast(origin, direction, params)
     end)
-
-    getgenv()._WolfAimV3InternalRay = false
 
     if not ok then
         return true
@@ -3285,14 +3312,13 @@ end
 -- ============================================================
 -- TARGET SELECTION
 --
--- Preserve the original feel:
--- choose the valid target closest to screen center and inside
--- AimbotRadius. Physical mouse position is never used.
+-- Preserve normal feel:
+-- target closest to screen center, inside FOV radius.
+-- Physical cursor position is irrelevant.
 -- ============================================================
 
 local function GetClosestPlayer()
     local cam = GetCurrentCamera()
-
     if not cam then
         return nil
     end
@@ -3313,14 +3339,14 @@ local function GetClosestPlayer()
                 )
 
                 if onScreen and pos.Z > 0 then
-                    local screenDistance = (
+                    local distance = (
                         Vector2.new(pos.X, pos.Y) - center
                     ).Magnitude
 
-                    if screenDistance <= closestDistance
+                    if distance <= closestDistance
                         and HasLineOfSight(player, targetPart) then
 
-                        closestDistance = screenDistance
+                        closestDistance = distance
                         closestPlayer = player
                     end
                 end
@@ -3328,612 +3354,161 @@ local function GetClosestPlayer()
         end
     end
 
+    CombatHacks.Target = closestPlayer
     return closestPlayer
 end
 
-local function GetAimPart()
-    local target = GetClosestPlayer()
-    CombatHacks.Target = target
+-- ============================================================
+-- GUN ORIGIN
+--
+-- Prefer a muzzle/fire point if one exists.
+-- Fall back to gun pivot, then camera position.
+-- ============================================================
 
-    if target and target.Character then
-        return GetTargetPart(target.Character), target
-    end
+local muzzleNames = {
+    "Muzzle",
+    "MuzzlePoint",
+    "FirePoint",
+    "FirePart",
+    "Barrel",
+    "Tip",
+    "Handle"
+}
 
-    return nil, nil
-end
-
-local function IsAimEnabled()
-    return CombatHacks.AimbotEnabled
-        or CombatHacks.SilentAimEnabled
-end
-
-local function InTimestampFireWindow()
-    return tick() - (CombatHacks.LastManualFireInput or -math.huge)
-        <= (CombatHacks.ManualFireWindow or 0.35)
-end
-
-local function IsMouseButtonPhysicallyDown()
-    local ok, down = pcall(function()
-        return UserInputService:IsMouseButtonPressed(
-            Enum.UserInputType.MouseButton1
-        )
-    end)
-
-    return ok and down == true
-end
-
-local function IsManualFireActive()
-    -- Critical V3 change:
-    -- The physical state is available even if the game's older callback
-    -- executes before our InputBegan callback.
-    return IsMouseButtonPhysicallyDown()
-        or InTimestampFireWindow()
-end
-
-local function PassHitChance()
-    local chance = math.clamp(
-        tonumber(CombatHacks.SilentAimHitChance) or 100,
-        0,
-        100
-    )
-
-    return math.random(1, 100) <= chance
-end
-
-local function DirectionToward(origin, targetPosition, originalLength)
-    local delta = targetPosition - origin
-
-    if delta.Magnitude < 0.001 then
+local function FindNamedDescendant(model, name)
+    if not model then
         return nil
     end
 
-    local length = tonumber(originalLength) or delta.Magnitude
+    local direct = model:FindFirstChild(name, true)
 
-    if length < 0.001 then
-        length = delta.Magnitude
+    if direct and (
+        direct:IsA("BasePart")
+        or direct:IsA("Attachment")
+    ) then
+        return direct
     end
 
-    return delta.Unit * length
+    return nil
 end
 
-getgenv()._WolfGetAimV3Target = GetClosestPlayer
+local function GetGunOrigin(gunModel)
+    if gunModel and typeof(gunModel) == "Instance" then
+        for _, name in ipairs(muzzleNames) do
+            local obj = FindNamedDescendant(gunModel, name)
 
--- ============================================================
--- MANUAL FIRE OBSERVER
--- Observation only; never creates a click.
--- ============================================================
-
-table.insert(
-    CombatHacks.Connections,
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            CombatHacks.LastManualFireInput = tick()
-
-            if not gameProcessed then
-                DebugPrint("Manual MouseButton1 detected")
+            if obj then
+                if obj:IsA("Attachment") then
+                    return obj.WorldPosition
+                elseif obj:IsA("BasePart") then
+                    return obj.Position
+                end
             end
         end
-    end)
-)
 
--- ============================================================
--- REMOTE ARGUMENT HELPERS
--- ============================================================
+        if gunModel:IsA("Model") then
+            local ok, pivot = pcall(function()
+                return gunModel:GetPivot()
+            end)
 
-local function KeyLooksAimRelated(key)
-    if type(key) ~= "string" then
-        return false
-    end
-
-    local k = key:lower():gsub("[_%-%s]", "")
-
-    return k == "position"
-        or k == "pos"
-        or k == "hit"
-        or k == "mousehit"
-        or k == "mouseposition"
-        or k == "mousepos"
-        or k == "targetposition"
-        or k == "targetpos"
-        or k == "endpoint"
-        or k == "endpos"
-        or k == "direction"
-        or k == "dir"
-        or k == "aim"
-        or k == "aimposition"
-        or k == "aimpos"
-        or k == "lookvector"
-        or k == "ray"
-        or k:find("aim", 1, true) ~= nil
-        or k:find("mouse", 1, true) ~= nil
-        or k:find("target", 1, true) ~= nil
-        or k:find("direction", 1, true) ~= nil
-end
-
-local function LooksLikeOriginPosition(v, origin)
-    return typeof(v) == "Vector3"
-        and (v - origin).Magnitude <= 12
-end
-
-local function LooksLikeDirectionVector(v, cam)
-    if typeof(v) ~= "Vector3" or v.Magnitude < 0.001 then
-        return false
-    end
-
-    -- Small vectors are commonly unit/normalized directions.
-    if v.Magnitude <= 5 then
-        return true
-    end
-
-    -- A longer direction is often aligned with the camera look vector.
-    if cam then
-        local dot = v.Unit:Dot(cam.CFrame.LookVector)
-        if dot > 0.65 then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function RewriteNestedTable(tbl, targetPos, origin, depth)
-    depth = depth or 0
-
-    if depth > 3 then
-        return tbl, false
-    end
-
-    local copy = {}
-    local changed = false
-
-    for k, v in pairs(tbl) do
-        local newValue = v
-        local didChange = false
-
-        if KeyLooksAimRelated(k) then
-            local t = typeof(v)
-
-            if t == "Vector3" then
-                local lk = type(k) == "string" and k:lower() or ""
-
-                if lk:find("dir", 1, true)
-                    or lk:find("look", 1, true) then
-
-                    local direction = DirectionToward(
-                        origin,
-                        targetPos,
-                        v.Magnitude
-                    )
-
-                    if direction then
-                        newValue = direction
-                        didChange = true
-                    end
-                else
-                    newValue = targetPos
-                    didChange = true
-                end
-
-            elseif t == "CFrame" then
-                newValue = CFrame.new(targetPos)
-                didChange = true
-
-            elseif t == "Ray" then
-                local direction = DirectionToward(
-                    v.Origin,
-                    targetPos,
-                    v.Direction.Magnitude
-                )
-
-                if direction then
-                    newValue = Ray.new(v.Origin, direction)
-                    didChange = true
-                end
-
-            elseif t == "table" then
-                newValue, didChange = RewriteNestedTable(
-                    v,
-                    targetPos,
-                    origin,
-                    depth + 1
-                )
+            if ok and pivot then
+                return pivot.Position
             end
-
-        elseif typeof(v) == "table" then
-            newValue, didChange = RewriteNestedTable(
-                v,
-                targetPos,
-                origin,
-                depth + 1
-            )
+        elseif gunModel:IsA("BasePart") then
+            return gunModel.Position
         end
-
-        copy[k] = newValue
-        changed = changed or didChange
     end
 
-    return changed and copy or tbl, changed
-end
-
-local function RewriteRemoteArgs(args, targetPos)
     local cam = GetCurrentCamera()
-    local origin = cam and cam.CFrame.Position
-        or (LocalPlayer.Character
-            and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            and LocalPlayer.Character.HumanoidRootPart.Position)
-        or Vector3.zero
-
-    local changed = false
-
-    -- First rewrite structured aim fields and explicit Ray values.
-    for i = 1, #args do
-        local v = args[i]
-        local t = typeof(v)
-
-        if t == "table" then
-            local newTable, didChange = RewriteNestedTable(
-                v,
-                targetPos,
-                origin,
-                0
-            )
-
-            if didChange then
-                args[i] = newTable
-                changed = true
-            end
-
-        elseif t == "Ray" then
-            local direction = DirectionToward(
-                v.Origin,
-                targetPos,
-                v.Direction.Magnitude
-            )
-
-            if direction then
-                args[i] = Ray.new(v.Origin, direction)
-                changed = true
-            end
-        end
+    if cam then
+        return cam.CFrame.Position
     end
 
-    -- Then inspect positional Vector3/CFrame values.
-    -- Rewrite only the BEST likely aim candidate instead of every vector;
-    -- this avoids replacing a weapon muzzle/origin position by accident.
-    local bestIndex = nil
-    local bestMode = nil
-    local bestScore = -math.huge
-
-    for i = 1, #args do
-        local v = args[i]
-        local t = typeof(v)
-
-        if t == "Vector3" then
-            if not LooksLikeOriginPosition(v, origin) then
-                local score = 0
-                local mode = "position"
-
-                if LooksLikeDirectionVector(v, cam) then
-                    score = score + 5
-                    mode = "direction"
-                else
-                    score = score + 3
-                end
-
-                -- Later positional args are more often target/direction
-                -- after an origin/muzzle argument.
-                score = score + (i * 0.05)
-
-                if score > bestScore then
-                    bestScore = score
-                    bestIndex = i
-                    bestMode = mode
-                end
-            end
-
-        elseif t == "CFrame" then
-            if (v.Position - origin).Magnitude > 12 then
-                local score = 3 + (i * 0.05)
-
-                if score > bestScore then
-                    bestScore = score
-                    bestIndex = i
-                    bestMode = "cframe"
-                end
-            end
-        end
-    end
-
-    if bestIndex then
-        local oldValue = args[bestIndex]
-
-        if bestMode == "direction" then
-            local direction = DirectionToward(
-                origin,
-                targetPos,
-                oldValue.Magnitude
-            )
-
-            if direction then
-                args[bestIndex] = direction
-                changed = true
-            end
-
-        elseif bestMode == "position" then
-            args[bestIndex] = targetPos
-            changed = true
-
-        elseif bestMode == "cframe" then
-            args[bestIndex] = CFrame.new(targetPos)
-            changed = true
-        end
-    end
-
-    return changed
+    return nil
 end
 
 -- ============================================================
--- MAIN AIM HOOKS
+-- PRECISE FIRE REMOTE HOOK
 -- ============================================================
 
-local function InstallAimHooks()
-    if getgenv()._WolfAimOnlyV3HooksInstalled then
+local function InstallFireHook()
+    if getgenv()._WolfTwistOfFateAimHookInstalled then
         return
     end
 
-    getgenv()._WolfAimOnlyV3HooksInstalled = true
-
-    -- --------------------------------------------------------
-    -- __namecall hook
-    -- --------------------------------------------------------
+    getgenv()._WolfTwistOfFateAimHookInstalled = true
 
     local OldNamecall
 
     OldNamecall = hookmetamethod(
         game,
         "__namecall",
-        newcclosure(function(self2, ...)
-            local args = {...}
+        newcclosure(function(self, ...)
             local method = getnamecallmethod()
-            local hacks = getgenv().CombatHacks
-
-            if not hacks
-                or not (hacks.AimbotEnabled or hacks.SilentAimEnabled) then
-
-                return OldNamecall(self2, ...)
-            end
-
-            if getgenv()._WolfAimV3InternalRay then
-                return OldNamecall(self2, ...)
-            end
-
-            -- workspace:Raycast(origin, direction, params)
-            if self2 == workspace
-                and method == "Raycast"
-                and typeof(args[1]) == "Vector3"
-                and typeof(args[2]) == "Vector3" then
-
-                local length = args[2].Magnitude
-
-                if length >= (hacks.MinimumAimRayMagnitude or 0.001) then
-                    local part = GetAimPart()
-
-                    if part and PassHitChance() then
-                        local direction = DirectionToward(
-                            args[1],
-                            part.Position,
-                            length
-                        )
-
-                        if direction then
-                            DebugPrint("Redirect Raycast", length)
-                            args[2] = direction
-                            return OldNamecall(self2, unpack(args))
-                        end
-                    end
-                end
-            end
-
-            -- Legacy ray APIs
-            if self2 == workspace
-                and (
-                    method == "FindPartOnRay"
-                    or method == "FindPartOnRayWithIgnoreList"
-                    or method == "FindPartOnRayWithWhitelist"
-                )
-                and typeof(args[1]) == "Ray" then
-
-                local part = GetAimPart()
-
-                if part and PassHitChance() then
-                    local oldRay = args[1]
-                    local direction = DirectionToward(
-                        oldRay.Origin,
-                        part.Position,
-                        oldRay.Direction.Magnitude
-                    )
-
-                    if direction then
-                        DebugPrint("Redirect", method)
-                        args[1] = Ray.new(oldRay.Origin, direction)
-                        return OldNamecall(self2, unpack(args))
-                    end
-                end
-            end
-
-            -- Camera ray builders
-            local cam = GetCurrentCamera()
-
-            if self2 == cam
-                and IsManualFireActive()
-                and (
-                    method == "ScreenPointToRay"
-                    or method == "ViewportPointToRay"
-                ) then
-
-                local part = GetAimPart()
-
-                if part and PassHitChance() then
-                    local origin = cam.CFrame.Position
-                    local direction = part.Position - origin
-
-                    if direction.Magnitude > 0.001 then
-                        DebugPrint("Redirect camera ray", method)
-                        return Ray.new(origin, direction.Unit)
-                    end
-                end
-            end
-
-            -- Client -> server shot data
-            if IsManualFireActive()
-                and (method == "FireServer" or method == "InvokeServer") then
-
-                -- Avoid calling IsA unless the method is already a remote call.
-                local isRemote = false
-
-                pcall(function()
-                    isRemote =
-                        self2:IsA("RemoteEvent")
-                        or self2:IsA("UnreliableRemoteEvent")
-                        or self2:IsA("RemoteFunction")
-                end)
-
-                if isRemote then
-                    local part = GetAimPart()
-
-                    if part and PassHitChance() then
-                        local changed = RewriteRemoteArgs(
-                            args,
-                            part.Position
-                        )
-
-                        if changed then
-                            DebugPrint(
-                                "Redirect remote",
-                                self2:GetFullName(),
-                                method
-                            )
-
-                            return OldNamecall(
-                                self2,
-                                unpack(args)
-                            )
-                        elseif hacks.DebugAim then
-                            DebugPrint(
-                                "Remote had no recognized aim arg:",
-                                self2:GetFullName()
-                            )
-                        end
-                    end
-                end
-            end
-
-            return OldNamecall(self2, ...)
-        end)
-    )
-
-    -- --------------------------------------------------------
-    -- Mouse.Hit / Mouse.Target
-    -- --------------------------------------------------------
-
-    local OldIndex
-
-    OldIndex = hookmetamethod(
-        game,
-        "__index",
-        newcclosure(function(self2, key)
             local hacks = getgenv().CombatHacks
 
             if hacks
                 and (hacks.AimbotEnabled or hacks.SilentAimEnabled)
-                and self2 == Mouse
-                and IsManualFireActive() then
+                and method == "FireServer"
+                and TwistFireRemote
+                and self == TwistFireRemote then
 
-                if key == "Hit" then
-                    local part = GetAimPart()
+                local args = {...}
 
-                    if part and PassHitChance() then
-                        DebugPrint("Redirect Mouse.Hit")
-                        return CFrame.new(part.Position)
-                    end
+                -- Confirmed signature:
+                -- args[1] = EmperorGun Model
+                -- args[2] = Vector3 direction, magnitude 1
+                if typeof(args[2]) == "Vector3" then
+                    local target = GetClosestPlayer()
 
-                elseif key == "Target" then
-                    local part = GetAimPart()
+                    if target and target.Character then
+                        local targetPart = GetTargetPart(target.Character)
 
-                    if part and PassHitChance() then
-                        DebugPrint("Redirect Mouse.Target")
-                        return part
+                        if targetPart then
+                            local hitChance = math.clamp(
+                                tonumber(hacks.SilentAimHitChance) or 100,
+                                0,
+                                100
+                            )
+
+                            if math.random(1, 100) <= hitChance then
+                                local origin = GetGunOrigin(args[1])
+
+                                if origin then
+                                    local delta = targetPart.Position - origin
+
+                                    if delta.Magnitude > 0.001 then
+                                        -- Preserve the original magnitude.
+                                        -- Probe confirmed it is normally exactly 1.
+                                        local originalMagnitude = args[2].Magnitude
+
+                                        if originalMagnitude <= 0.001 then
+                                            originalMagnitude = 1
+                                        end
+
+                                        args[2] =
+                                            delta.Unit * originalMagnitude
+
+                                        return OldNamecall(
+                                            self,
+                                            unpack(args)
+                                        )
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
             end
 
-            return OldIndex(self2, key)
+            return OldNamecall(self, ...)
         end)
     )
-
-    -- --------------------------------------------------------
-    -- Optional direct workspace.Raycast hook.
-    -- Some LocalScripts call workspace.Raycast(workspace, ...)
-    -- instead of workspace:Raycast(...), which can bypass __namecall.
-    -- --------------------------------------------------------
-
-    if type(hookfunction) == "function" then
-        pcall(function()
-            if getgenv()._WolfAimV3DirectRayHookInstalled then
-                return
-            end
-
-            getgenv()._WolfAimV3DirectRayHookInstalled = true
-
-            local OriginalRaycast
-
-            OriginalRaycast = hookfunction(
-                workspace.Raycast,
-                newcclosure(function(self2, origin, direction, params)
-                    local hacks = getgenv().CombatHacks
-
-                    if hacks
-                        and (hacks.AimbotEnabled or hacks.SilentAimEnabled)
-                        and not getgenv()._WolfAimV3InternalRay
-                        and self2 == workspace
-                        and typeof(origin) == "Vector3"
-                        and typeof(direction) == "Vector3"
-                        and direction.Magnitude >=
-                            (hacks.MinimumAimRayMagnitude or 0.001) then
-
-                        local part = GetAimPart()
-
-                        if part and PassHitChance() then
-                            local redirected = DirectionToward(
-                                origin,
-                                part.Position,
-                                direction.Magnitude
-                            )
-
-                            if redirected then
-                                DebugPrint(
-                                    "Redirect direct workspace.Raycast"
-                                )
-
-                                direction = redirected
-                            end
-                        end
-                    end
-
-                    return OriginalRaycast(
-                        self2,
-                        origin,
-                        direction,
-                        params
-                    )
-                end)
-            )
-        end)
-    end
 end
 
 -- ============================================================
--- FOV DISPLAY ONLY
+-- FOV DISPLAY LOOP ONLY
+-- No camera / mouse / shooting control.
 -- ============================================================
 
 table.insert(
@@ -3954,7 +3529,6 @@ table.insert(
 
         FOVCircle.Radius = CombatHacks.AimbotRadius
         FOVCircle.Color = CombatHacks.FOVColor
-
         FOVCircle.Visible =
             CombatHacks.ShowFOV
             and CombatHacks.AimbotEnabled
@@ -3962,14 +3536,14 @@ table.insert(
 )
 
 -- ============================================================
--- UI API
+-- EXISTING UI API
 -- ============================================================
 
 function CombatHacks:ToggleAimbot(state)
     self.AimbotEnabled = state == true
 
     if self.AimbotEnabled then
-        InstallAimHooks()
+        InstallFireHook()
     else
         self.Target = nil
     end
@@ -3985,8 +3559,9 @@ function CombatHacks:ToggleFOV(state)
 end
 
 function CombatHacks:SetSmoothness(val)
-    -- Retained for the existing UI only.
-    self.AimbotSmoothness = tonumber(val) or self.AimbotSmoothness
+    -- UI compatibility only. Camera is never moved.
+    self.AimbotSmoothness =
+        tonumber(val) or self.AimbotSmoothness
 end
 
 function CombatHacks:SetTargetType(targetType)
@@ -4013,7 +3588,7 @@ function CombatHacks:ToggleSilentAim(state)
     self.SilentAimEnabled = state == true
 
     if self.SilentAimEnabled then
-        InstallAimHooks()
+        InstallFireHook()
     end
 end
 
@@ -4382,7 +3957,7 @@ local CombatSection = CombatTab:AddSection({
 })
 
 CombatSection:AddToggle({
-    Name = "Auto Aim (Manual Fire)",
+    Name = "Auto Aim (Twist of Fate)",
     Default = false,
     Callback = function(Value)
         if getgenv().CombatHacks then getgenv().CombatHacks:ToggleAimbot(Value) end
