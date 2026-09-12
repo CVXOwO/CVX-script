@@ -74,7 +74,7 @@ end
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 -- ==================== 配置區 ====================
-local Settings = { EnableFlashStep = true, ZAimbot = true, CAimbot = true, TeamCheck = true, EnableSpeed = true, SpeedValue = 70, EnableSoulGuitarGlitch = true, LowVisualMode = false, GlitchFlySpeed = 250, EnableTargetLock = false, TargetName = "", MaxDistance = 1000, FlashStepRange = 250, Offset = 3, FlashStepCooldown = 0, SanguineCCooldown = 2, CAimBlockCooldown = 2, DoorFruitKeywords = { "door", "門", "portal" }, GodhumanKeywords = { "godhuman", "god human", "神人拳", "神人" }, SanguineKeywords = { "sanguine", "sanguine art", "血拳", "血藝" }, DragonheartKeywords = { "dragonheart", "dragon heart" }, TTKKeywords = { "true triple katana", "ttk" }, SoulGuitarKeywords = { "soul guitar", "soulguitar", "skull guitar", "skullguitar", "靈魂吉他", "骷髏吉他" } }
+local Settings = { EnableFlashStep = true, ZAimbot = true, CAimbot = true, TeamCheck = true, EnableSpeed = true, SpeedValue = 70, EnableSoulGuitarGlitch = true, GlitchFlySpeed = 250, EnableTargetLock = false, TargetName = "", MaxDistance = 1000, FlashStepRange = 250, Offset = 3, FlashStepCooldown = 0, SanguineCCooldown = 2, CAimBlockCooldown = 2, DoorFruitKeywords = { "door", "門", "portal" }, GodhumanKeywords = { "godhuman", "god human", "神人拳", "神人" }, SanguineKeywords = { "sanguine", "sanguine art", "血拳", "血藝" }, DragonheartKeywords = { "dragonheart", "dragon heart" }, TTKKeywords = { "true triple katana", "ttk" }, SoulGuitarKeywords = { "soul guitar", "soulguitar", "skull guitar", "skullguitar", "靈魂吉他", "骷髏吉他" } }
 -- ==================== 狀態變數 ====================
 local LastFlashStep = 0
 local LastCTime = -math.huge
@@ -1013,13 +1013,6 @@ local function CreateGUI()
         local BtnStroke = Stroke( Btn, Settings[ settingKey ] and Theme.Green or Theme.Red, 0.28, 1 )
         Btn.MouseButton1Click:Connect( function()
                 Settings[ settingKey ] = not Settings[ settingKey ]
-
-                if settingKey == "LowVisualMode"
-                    and type(_G.SetLowVisualState) == "function"
-                then
-                    _G.SetLowVisualState(Settings.LowVisualMode)
-                end
-
                 local c = Settings[ settingKey ] and Theme.Green or Theme.Red
                 Btn.Text = Settings[ settingKey ] and "ONLINE" or "OFFLINE"
                 TweenService:Create( Btn, TweenInfo.new( 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out ), { BackgroundColor3 = c } ):Play()
@@ -1041,14 +1034,13 @@ local function CreateGUI()
     CreateToggleButton( "TEAM FILTER", "TeamCheck", 4 )
     CreateToggleButton( "COMBAT SPEED", "EnableSpeed", 5 )
     CreateToggleButton( "SOUL GUITAR GLITCH", "EnableSoulGuitarGlitch", 6 )
-    CreateToggleButton( "LOW VISUAL MODE", "LowVisualMode", 7 )
     -- ==================== Speed ====================
     local SpeedFrame = Instance.new( "Frame" )
     SpeedFrame.Size = UDim2.new( 0, 272, 0, 48 )
     SpeedFrame.BackgroundColor3 = Theme.Panel
     SpeedFrame.BackgroundTransparency = 0.08
     SpeedFrame.BorderSizePixel = 0
-    SpeedFrame.LayoutOrder = 8
+    SpeedFrame.LayoutOrder = 7
     SpeedFrame.ZIndex = 9
     SpeedFrame.Parent = ScrollContainer
     Corner( SpeedFrame, 10 )
@@ -1091,14 +1083,14 @@ local function CreateGUI()
             end
             TweenService:Create( SpeedBoxStroke, TweenInfo.new( 0.18 ), { Transparency = 0.5 } ):Play()
         end )
-    CreateToggleButton( "TARGET LOCK", "EnableTargetLock", 9 )
+    CreateToggleButton( "TARGET LOCK", "EnableTargetLock", 8 )
     -- ==================== Target Dropdown ====================
     local DropdownFrame = Instance.new( "Frame" )
     DropdownFrame.Size = UDim2.new( 0, 272, 0, 42 )
     DropdownFrame.BackgroundColor3 = Theme.Panel
     DropdownFrame.BackgroundTransparency = 0.08
     DropdownFrame.BorderSizePixel = 0
-    DropdownFrame.LayoutOrder = 10
+    DropdownFrame.LayoutOrder = 9
     DropdownFrame.ZIndex = 9
     DropdownFrame.Parent = ScrollContainer
     Corner( DropdownFrame, 10 )
@@ -1136,7 +1128,7 @@ local function CreateGUI()
     PlayerListFrame.BackgroundTransparency = 0.02
     PlayerListFrame.BorderSizePixel = 0
     PlayerListFrame.Visible = false
-    PlayerListFrame.LayoutOrder = 11
+    PlayerListFrame.LayoutOrder = 10
     PlayerListFrame.ScrollBarThickness = 2
     PlayerListFrame.ScrollBarImageColor3 = Theme.Blue
     PlayerListFrame.CanvasSize = UDim2.new( 0, 0, 0, 0 )
@@ -1528,12 +1520,11 @@ LocalPlayer.CharacterAdded:Connect( function( char )
 -- 低配模式
 -- 直接沿用穩定版 SetLowVisualState 核心處理
 -- ============================================================
-_G.LowVisualMode = false
+_G.LowVisualMode = true
 _G.LowVisualConnection = nil
 
 _G.SetLowVisualState = function(state)
-    _G.LowVisualMode = state and true or false
-    Settings.LowVisualMode = _G.LowVisualMode
+    _G.LowVisualMode = state
 
     if _G.LowVisualMode then
         local Lighting = game:GetService("Lighting")
@@ -1620,6 +1611,9 @@ InstallRZSilentAimHooks()
 -- 每次執行都 queue 下一次換服。
 SetupStableAutoExecute()
 
--- 低配模式預設關閉；需要時可從 GUI 的 LOW VISUAL MODE 自行開啟。
-_G.LowVisualMode = false
-Settings.LowVisualMode = false
+-- 每次執行都自動開啟低配。
+task.defer(function()
+    pcall(function()
+        _G.SetLowVisualState(true)
+    end)
+end)
